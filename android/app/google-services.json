@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "482472985675",
+    "project_id": "manzil-app-9e060",
+    "storage_bucket": "manzil-app-9e060.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:482472985675:android:7c7c5daf857741f56d39ce",
+        "android_client_info": {
+          "package_name": "com.example.manzil_app_v2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjepcTKwWej9kdEQvahQPfoN3YXzbh_po"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
