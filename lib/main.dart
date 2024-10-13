@@ -1,7 +1,7 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:manzil_app_v2/screens/splash_screen.dart';
@@ -26,10 +26,14 @@ void main() async {
 
   initializeService();
 
-  runApp(const BackgroundDetector(child: MyApp()));
-
+  runApp(
+    const BackgroundDetector(
+      child: ProviderScope(
+        child: MyApp(),
+      ),
+    ),
+  );
 }
-
 
 void startBackgroundService() {
   final service = FlutterBackgroundService();
@@ -75,15 +79,13 @@ void onStart(ServiceInstance service) async {
 
   SocketHandler();
 
-  chatService.getUsers().then((users){
-
+  chatService.getUsers().then((users) {
     for (var user in users) {
-
-      if(box.read('phoneNumber') == user['phoneNumber']){
+      if (box.read('phoneNumber') == user['phoneNumber']) {
         box.write("_id", user["_id"]);
       }
 
-      if(box.read("_id") == user['_id']){
+      if (box.read("_id") == user['_id']) {
         continue;
       }
 
@@ -92,19 +94,18 @@ void onStart(ServiceInstance service) async {
       String eventId = ids.join("_");
       Map<String, dynamic> message;
 
-      SocketHandler.socket.on(eventId, (data) =>  {
-        message = List.from(data).first as Map<String, dynamic>,
-        if(message['senderId'] != box.read("_id")){
-            notificationPlugin.showNotification(message)
-        }
-      });
+      SocketHandler.socket.on(
+          eventId,
+          (data) => {
+                message = List.from(data).first as Map<String, dynamic>,
+                if (message['senderId'] != box.read("_id"))
+                  {notificationPlugin.showNotification(message)}
+              });
     }
   });
 
   service.on("stop");
-
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -127,7 +128,7 @@ class MyApp extends StatelessWidget {
             return const SplashScreen();
           },
         )
-      // home: const SplashScreen(),
-    );
+        // home: const SplashScreen(),
+        );
   }
 }

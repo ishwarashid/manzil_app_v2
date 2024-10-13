@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/main.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
+import 'package:manzil_app_v2/screens/find_drivers.dart';
 
 class MainDrawer extends StatelessWidget {
   const MainDrawer({super.key});
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +32,17 @@ class MainDrawer extends StatelessWidget {
                       const SizedBox(
                         width: 16,
                       ),
-                      Text(
-                        "${box.read('firstName')} ${box.read('lastName')}",
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            fontSize: 24),
+                      Expanded(
+                        child: Text(
+                          "${box.read('firstName')} ${box.read('lastName')}",
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary,
+                              fontSize: 24),
+                          softWrap: true,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-
                     ],
                   ),
                 ),
@@ -83,6 +86,31 @@ class MainDrawer extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const ChatsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
+                child: ListTile(
+                  title: Text(
+                    "Found Drivers",
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 20),
+                  ),
+                  leading: Icon(
+                    Icons.home_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 30,
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FindDrivers(),
                       ),
                     );
                   },
