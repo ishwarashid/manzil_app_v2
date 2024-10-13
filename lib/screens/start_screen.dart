@@ -26,7 +26,7 @@ class StartScreen extends StatelessWidget {
           //   width: double.infinity,
           //   fit: BoxFit.cover,
           // ),
-          Container(
+          SizedBox(
             // margin: const EdgeInsets.all(100),
             width: 280,
             child: Image.asset(

@@ -1,6 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/screens/user_chat_screen.dart';
+
 
 class ChatListItem extends StatefulWidget {
   const ChatListItem({super.key, required this.userData});
@@ -12,16 +13,19 @@ class ChatListItem extends StatefulWidget {
 }
 
 class _ChatListItemState extends State<ChatListItem> {
-
-  final _currentUser = FirebaseAuth.instance.currentUser;
-
+  final box = GetStorage();
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = box.read("phoneNumber");
 
-    if (widget.userData["id"] != _currentUser!.uid) {
+    if(widget.userData["phoneNumber"] == currentUser){
+      box.write("_id", widget.userData["_id"]);
+    }
 
-      final fullName = widget.userData["first_name"] + " " + widget.userData["last_name"];
+    if (widget.userData["phoneNumber"] != currentUser) {
+
+      final fullName = "${widget.userData["firstName"]} ${widget.userData["lastName"]}";
 
       return GestureDetector(
         onTap: () {
@@ -30,7 +34,7 @@ class _ChatListItemState extends State<ChatListItem> {
             MaterialPageRoute(
               builder: (context) => UserChatScreen(
                 fullName: fullName,
-                receiverId: widget.userData["id"],
+                receiverId: widget.userData["_id"],
               ),
             ),
           );

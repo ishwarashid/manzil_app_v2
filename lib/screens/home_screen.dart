@@ -1,23 +1,71 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:manzil_app_v2/main.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
 import 'package:manzil_app_v2/screens/user_chat_screen.dart';
-import 'package:manzil_app_v2/widgets/chat_list.dart';
 import 'package:manzil_app_v2/widgets/main_drawer.dart';
+import 'booking_screen.dart';
+import 'get_started_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
+
 }
 
 class _HomeScreenState extends State<HomeScreen> {
 
+  Future<int> getUser() async {
+    const url = "https://shrimp-select-vertically.ngrok-free.app";
+
+    var box = GetStorage();
+    var phoneNumber = Uri.encodeQueryComponent(box.read('phoneNumber'));
+
+    final response = await http.get(
+      Uri.parse('$url/users?phoneNumber=$phoneNumber'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    );
+
+    if (response.statusCode == 404) {
+      return 404;
+    }
+
+
+    final user = jsonDecode(response.body) as Map<String, dynamic>;
+
+    box.write('firstName', user['data']['firstName'] as String);
+    box.write('lastName', user['data']['lastName'] as String);
+
+    return 200;
+
+  }
+
+  // @override
+  // void dispose() {
+  //   stopBackgroundService();
+  //   super.dispose();
+  // }
+
   @override
   Widget build(BuildContext context) {
+    getUser().then((status){
+      if(status == 404){
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GetStartedScreen(),
+            ));
+      }
+    });
+
+    startBackgroundService();
 
     return Scaffold(
       appBar: AppBar(
@@ -26,7 +74,13 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                    builder: (context) => const BookingScreen(),
+                ));
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -46,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       drawer: const MainDrawer(),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 50, 20, 30),
+        padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -109,7 +163,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           );
-                          print("back from chat");
 
                         },
                       )
@@ -188,7 +241,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           );
 
-                          print("back from chat");
                           Navigator.push(
                             context,
                             MaterialPageRoute(

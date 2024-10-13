@@ -1,8 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
-
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:manzil_app_v2/screens/otp_screen.dart';
 
 class PhoneScreen extends StatefulWidget {
@@ -27,57 +25,82 @@ class _PhoneScreenState extends State<PhoneScreen> {
 
   void _sendCode() async {
     try {
-      await FirebaseAuth.instance.verifyPhoneNumber(
-          phoneNumber: _phoneNumber,
-          verificationCompleted: (PhoneAuthCredential credential) {},
-          verificationFailed: (FirebaseAuthException e) {
-            setState(() {
-              _isProcessing = false;
-            });
-            String errorMessage = 'An error occurred';
-            switch (e.code) {
-              case 'invalid-verification-code':
-                errorMessage = 'Invalid verification code';
-                break;
-              case 'session-expired':
-                errorMessage = 'Verification session expired';
-                break;
-              case 'quota-exceeded':
-                errorMessage = 'Quota exceeded, try again later';
-                break;
-              case 'too-many-requests':
-                errorMessage =
-                'Too many verification attempts, try again later';
-                break;
-              case 'user-disabled':
-                errorMessage = 'User disabled, contact support';
-                break;
-              case 'invalid-phone-number':
-                errorMessage = 'Invalid Phone Number';
-                break;
-              case 'network-request-failed':
-                errorMessage =
-                'Network request failed, check your internet connection';
-                break;
-              default:
-                errorMessage = 'Unknown error occurred: ${e.code}';
-            }
-            ScaffoldMessenger.of(context).clearSnackBars();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(errorMessage),
-              ),
-            );
-          },
-          codeSent: (String vid, int? token) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) =>
-                    OtpScreen(vid: vid, phoneNumber: _phoneNumber, resendToken: token),
-              ),
-            );
-          },
-          codeAutoRetrievalTimeout: (vid) {});
+      // await FirebaseAuth.instance.verifyPhoneNumber(
+      //     phoneNumber: _phoneNumber,
+      //     verificationCompleted: (PhoneAuthCredential credential) {},
+      //     verificationFailed: (FirebaseAuthException e) {
+      //       setState(() {
+      //         _isProcessing = false;
+      //       });
+      //       String errorMessage = 'An error occurred';
+      //       switch (e.code) {
+      //         case 'invalid-verification-code':
+      //           errorMessage = 'Invalid verification code';
+      //           break;
+      //         case 'session-expired':
+      //           errorMessage = 'Verification session expired';
+      //           break;
+      //         case 'quota-exceeded':
+      //           errorMessage = 'Quota exceeded, try again later';
+      //           break;
+      //         case 'too-many-requests':
+      //           errorMessage =
+      //           'Too many verification attempts, try again later';
+      //           break;
+      //         case 'user-disabled':
+      //           errorMessage = 'User disabled, contact support';
+      //           break;
+      //         case 'invalid-phone-number':
+      //           errorMessage = 'Invalid Phone Number';
+      //           break;
+      //         case 'network-request-failed':
+      //           errorMessage =
+      //           'Network request failed, check your internet connection';
+      //           break;
+      //         default:
+      //           errorMessage = 'Unknown error occurred: ${e.code}';
+      //       }
+      //       ScaffoldMessenger.of(context).clearSnackBars();
+      //       ScaffoldMessenger.of(context).showSnackBar(
+      //         SnackBar(
+      //           content: Text(errorMessage),
+      //         ),
+      //       );
+      //     },
+      //     codeSent: (String vid, int? token) {
+      //       Navigator.of(context).pushReplacement(
+      //         MaterialPageRoute(
+      //           builder: (context) =>
+      //               OtpScreen(vid: vid, phoneNumber: _phoneNumber, resendToken: token),
+      //         ),
+      //       );
+      //     },
+      //     codeAutoRetrievalTimeout: (vid) {});
+      const url = "https://shrimp-select-vertically.ngrok-free.app";
+      final response = await http.post(
+        Uri.parse('$url/sendotp'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(<String, String>{
+          'phone': _phoneNumber,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _isProcessing = false;
+        });
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) =>
+                OtpScreen(phoneNumber: _phoneNumber),
+          ),
+        );
+      } else {
+        throw Exception('Failed to send otp.');
+      }
+
     } catch (e) {
       setState(() {
         _isProcessing = false;

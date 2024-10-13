@@ -1,91 +1,84 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/models/message.dart';
+import 'package:http/http.dart' as http;
 
 class ChatService {
-  final FirebaseFirestore _firebase = FirebaseFirestore.instance;
+  final box = GetStorage();
+  final url = "https://shrimp-select-vertically.ngrok-free.app";
 
-  Stream<List<Map<String, dynamic>>> getUsersStream() {
-    return _firebase.collection("users").snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final user = doc.data();
-        user["id"] = doc.id;
-        return user;
-      }).toList();
-    });
+  Future<List<dynamic>> getUsers() async {
+
+    final response = await http.get(
+      Uri.parse('$url/users'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    );
+
+    final usersData = jsonDecode(response.body) as Map<String, dynamic>;
+    final users = List.castFrom(usersData['data']);
+    return users;
+
   }
-
-  // return FirebaseFirestore.instance.collection("chat_rooms").doc(chatRoomId)
-  //     .collection("messages").orderBy("timestamp", descending: true)
-  //     .snapshots();
-
-  // Stream<List<Map<String, dynamic>>> getUsersStream(
-  //     String userId, otherUserId) {
-  //   List<String> ids = [userId, otherUserId];
-  //   ids.sort();
-  //   String chatRoomId = ids.join("_");
-  //
-  //   return _firebase
-  //       .collection("chat_rooms")
-  //       .doc(chatRoomId)
-  //       .collection("messages")
-  //       .where("senderId", whereIn: [userId, otherUserId])
-  //       .where("receiverId", whereIn: [userId, otherUserId])
-  //       .snapshots()
-  //       .map((snapshot) {
-  //         return snapshot.docs.map((doc) {
-  //           final user = doc.data();
-  //           user["id"] = doc.id;
-  //           return user;
-  //         }).toList();
-  //       });
-  // }
 
   // send message
   Future<void> sendMessage(String receiverId, message) async {
-    final currentUserId = FirebaseAuth.instance.currentUser!.uid;
-    final Timestamp timestamp = Timestamp.now();
+    final currentUserId = box.read("_id");
 
-    print("inside sendMessage");
-
-    CollectionReference users = FirebaseFirestore.instance.collection('users');
-    DocumentSnapshot docSnapshot = await users.doc(currentUserId).get();
-
-    final data = docSnapshot.data() as Map<String, dynamic>;
-
-    final fullName = data["first_name"] + " " + data["last_name"];
+    final fullName = box.read("firstName") + " " + box.read("lastName");
 
     Message newMessage = Message(
         senderId: currentUserId,
         senderName: fullName,
         receiverId: receiverId,
-        message: message,
-        timestamp: timestamp);
-    print("after message");
+        message: message);
 
     List<String> ids = [currentUserId, receiverId];
     ids.sort();
     String chatRoomId = ids.join("_");
-    await FirebaseFirestore.instance
-        .collection("chat_rooms")
-        .doc(chatRoomId)
-        .collection("messages")
-        .add(newMessage.toMap());
 
-    print("after saving message");
+    addMessage(chatRoomId, newMessage);
+
   }
 
   // get messages
-  Stream<QuerySnapshot> getMessages(String userId, otherUserId) {
+  Future<List<dynamic>> getMessages(String userId, otherUserId) async {
     List<String> ids = [userId, otherUserId];
     ids.sort();
     String chatRoomId = ids.join("_");
 
-    return FirebaseFirestore.instance
-        .collection("chat_rooms")
-        .doc(chatRoomId)
-        .collection("messages")
-        .orderBy("timestamp", descending: true)
-        .snapshots();
+    final response = await http.get(
+      Uri.parse('$url/chatrooms?id=$chatRoomId'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    );
+
+    if(response.statusCode == 404){
+      return [];
+    }
+
+    final chatroom = jsonDecode(response.body) as Map<String, dynamic>;
+    final messages = List.castFrom(chatroom['data']['messages']).reversed.toList();
+    return messages;
+
+  }
+
+
+  void addMessage(String chatRoomId, Message message) async {
+
+    await http.post(
+      Uri.parse('$url/chatrooms'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        "_id": chatRoomId,
+        "message": jsonEncode(message.toMap())
+    }),
+    );
+
+    return null;
   }
 }

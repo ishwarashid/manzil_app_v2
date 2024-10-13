@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:manzil_app_v2/services/chat/chat_services.dart';
 import 'package:manzil_app_v2/widgets/chat_list_item.dart';
 
@@ -10,8 +9,9 @@ class ChatList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: _chatService.getUsersStream(),
+
+    return FutureBuilder(
+      future: _chatService.getUsers(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const Center(
@@ -23,7 +23,6 @@ class ChatList extends StatelessWidget {
             child: CircularProgressIndicator(),
           );
         }
-
         return ListView(
           children: snapshot.data!
               .map<Widget>((userData) => ChatListItem(userData: userData))
@@ -31,6 +30,5 @@ class ChatList extends StatelessWidget {
         );
       },
     );
-    ;
   }
 }

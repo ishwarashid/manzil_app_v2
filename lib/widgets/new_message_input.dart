@@ -48,6 +48,5 @@ class _NewMessageInputState extends State<NewMessageInput> {
         ],
       ),
     );
-    ;
   }
 }

@@ -9,14 +9,11 @@ class UserChatScreen extends StatelessWidget {
   final String fullName;
   final String receiverId;
 
-  // final TextEditingController _messageController = TextEditingController();
   final ChatService _chatService = ChatService();
 
   void _sendMessage(String enteredMessage) async {
-    print(enteredMessage);
 
     if (enteredMessage.trim().isNotEmpty) {
-      print(enteredMessage.trim().isNotEmpty);
       await _chatService.sendMessage(receiverId, enteredMessage);
     }
   }

@@ -1,13 +1,17 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:manzil_app_v2/main.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
 
 class MainDrawer extends StatelessWidget {
   const MainDrawer({super.key});
 
+
+
   @override
   Widget build(BuildContext context) {
+    final box = GetStorage();
+
     return Drawer(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -29,56 +33,13 @@ class MainDrawer extends StatelessWidget {
                       const SizedBox(
                         width: 16,
                       ),
-                      StreamBuilder<DocumentSnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(FirebaseAuth.instance.currentUser!.uid)
-                            .snapshots(),
-                        builder: (BuildContext context, snapshot) {
-                          if (snapshot.hasError) {
-                            return Text('Error: ${snapshot.error}');
-                          }
-
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const CircularProgressIndicator(); // Show loading indicator while waiting for data
-                          }
-
-                          if (snapshot.hasData) {
-                            print(FirebaseAuth.instance.currentUser);
-                            final userData =
-                                snapshot.data!.data() as Map<String, dynamic>;
-                            final userName = userData['first_name'] +
-                                " " +
-                                userData["last_name"];
-                            return ClipRect(
-                              child: Text(
-                                userName,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onPrimary,
-                                  fontSize: 24,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            );
-                          } else {
-                            return Text(
-                              "Loading...",
-                              style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.onPrimary,
-                                  fontSize: 24),
-                            );
-                          }
-                        },
+                      Text(
+                        "${box.read('firstName')} ${box.read('lastName')}",
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: 24),
                       ),
 
-                      // Text(
-                      //   fullName,
-                      //   style: TextStyle(
-                      //       color: Theme.of(context).colorScheme.onPrimary,
-                      //       fontSize: 24),
-                      // ),
                     ],
                   ),
                 ),
@@ -143,7 +104,13 @@ class MainDrawer extends StatelessWidget {
                 size: 30,
               ),
               onTap: () {
-                FirebaseAuth.instance.signOut();
+                box.erase();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MyApp(),
+                  ),
+                );
               },
             ),
           ),
