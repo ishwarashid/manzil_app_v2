@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:rxdart/subjects.dart';
 
@@ -73,10 +75,9 @@ class NotificationPlugin {
       message['senderName'],
       message['message'],
       platformChannelSpecifics,
-      payload: message['message'],
+      payload: jsonEncode(message),
     );
   }
-
 
   Future<void> repeatNotification() async {
     var androidChannelSpecifics = const AndroidNotificationDetails(
@@ -100,65 +101,6 @@ class NotificationPlugin {
   }
 
 
-  Future<void> scheduleNotification() async {
-    // var androidChannelSpecifics = const AndroidNotificationDetails(
-    //   'CHANNEL_ID 1',
-    //   'CHANNEL_NAME 1',
-    //   icon: 'secondary_icon',
-    //   sound: RawResourceAndroidNotificationSound('my_sound'),
-    //   largeIcon: DrawableResourceAndroidBitmap('large_notf_icon'),
-    //   enableLights: true,
-    //   color: Color.fromARGB(255, 255, 0, 0),
-    //   ledColor: Color.fromARGB(255, 255, 0, 0),
-    //   ledOnMs: 1000,
-    //   ledOffMs: 500,
-    //   importance: Importance.max,
-    //   priority: Priority.high,
-    //   playSound: true,
-    //   timeoutAfter: 5000,
-    //   styleInformation: DefaultStyleInformation(true, true),
-    // );
-
-
-
-    // await flutterLocalNotificationsPlugin.schedule(
-    //   0,
-    //   'Test Title',
-    //   'Test Body',
-    //   scheduleNotificationDateTime,
-    //   platformChannelSpecifics,
-    //   payload: 'Test Payload',
-    // );
-  }
-
-
-  // Future<void> showNotificationWithAttachment() async {
-  //   // var attachmentPicturePath = await _downloadAndSaveFile(
-  //   //     'https://via.placeholder.com/800x200', 'attachment_img.jpg');
-  //   var bigPictureStyleInformation = BigPictureStyleInformation(
-  //     FilePathAndroidBitmap(attachmentPicturePath),
-  //     contentTitle: '<b>Attached Image</b>',
-  //     htmlFormatContentTitle: true,
-  //     summaryText: 'Test Image',
-  //     htmlFormatSummaryText: true,
-  //   );
-  //   var androidChannelSpecifics = AndroidNotificationDetails(
-  //     'CHANNEL ID 2',
-  //     'CHANNEL NAME 2',
-  //     importance: Importance.high,
-  //     priority: Priority.high,
-  //     styleInformation: bigPictureStyleInformation,
-  //   );
-  //   var notificationDetails =
-  //   NotificationDetails(android: androidChannelSpecifics);
-  //   await flutterLocalNotificationsPlugin.show(
-  //     0,
-  //     'Title with attachment',
-  //     'Body with Attachment',
-  //     notificationDetails,
-  //   );
-  // }
-
 
   Future<int> getPendingNotificationCount() async {
     List<PendingNotificationRequest> p =
@@ -167,8 +109,8 @@ class NotificationPlugin {
   }
 
 
-  Future<void> cancelNotification() async {
-    await flutterLocalNotificationsPlugin.cancel(0);
+  Future<void> cancelNotification(message) async {
+    await flutterLocalNotificationsPlugin.cancel(message['_id'].hashCode);
   }
 
 

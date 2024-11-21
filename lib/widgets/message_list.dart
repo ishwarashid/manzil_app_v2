@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/services/chat/chat_services.dart';
 import 'package:manzil_app_v2/widgets/message_bubble.dart';
-
 import '../services/socket_handler.dart';
 
 class MessageList extends StatefulWidget {
@@ -43,12 +42,11 @@ class _MessageListState extends State<MessageList> {
     String eventId = ids.join("_");
 
     SocketHandler.socket.on(eventId, (data) =>  {
-
-    if(mounted){
-        setState(() {
-      loadedMessages = [List.from(data).first, ...loadedMessages];
-        })
-      }
+      if(mounted){
+          setState(() {
+        loadedMessages = [data, ...loadedMessages];
+          })
+        }
     });
     super.initState();
   }

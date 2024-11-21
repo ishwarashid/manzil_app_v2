@@ -9,5 +9,4 @@ class SocketHandler {
           .setTransports(['websocket'])
           .enableForceNew()
           .build());
-
 }

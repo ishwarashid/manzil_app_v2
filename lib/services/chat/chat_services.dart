@@ -22,6 +22,36 @@ class ChatService {
 
   }
 
+  Future<List<dynamic>> getRideUsers() async {
+    String userId = box.read("_id");
+    final response = await http.get(
+      Uri.parse('$url/ride-users/$userId'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    );
+
+    if(response.statusCode == 404){
+      return [];
+    }
+
+    final usersData = jsonDecode(response.body) as Map<String, dynamic>;
+
+    List<dynamic> users = [];
+
+    if(userId != usersData['data']['driver']["_id"].toString()){
+      users.add(usersData['data']['driver']);
+      return users;
+    }
+
+    List.castFrom(usersData['data']['passengers']).forEach((passenger){
+      users.add(passenger["passenger"]);
+    });
+
+    return users;
+
+  }
+
   // send message
   Future<void> sendMessage(String receiverId, message) async {
     final currentUserId = box.read("_id");

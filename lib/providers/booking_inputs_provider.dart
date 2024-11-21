@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
   BookingInputsNotifier()
       : super({
-    "pickup": 'Tariq Bin Ziad Colony', // will come from map
+    "pickup": '', // will come from map
     "destination": '',
     "seats": 0,
     "fare": 0,
@@ -46,7 +46,7 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
 
   void resetBookingInputs() {
     state = {
-      "pickup": 'Tariq Bin Ziad Colony', // will come from map
+      "pickup": '', // will come from map
       "destination": '',
       "seats": 0,
       "fare": 0,

@@ -11,7 +11,7 @@ class ChatList extends StatelessWidget {
   Widget build(BuildContext context) {
 
     return FutureBuilder(
-      future: _chatService.getUsers(),
+      future: _chatService.getRideUsers(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const Center(

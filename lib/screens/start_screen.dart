@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:manzil_app_v2/screens/home_screen.dart';
 import 'package:manzil_app_v2/screens/phone_screen.dart';
 
 class StartScreen extends StatelessWidget {
@@ -6,6 +8,13 @@ class StartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final box = GetStorage();
+
+    String? phoneNumber = box.read('phoneNumber');
+    if ( phoneNumber != null && phoneNumber.isNotEmpty) {
+      return const HomeScreen();
+    }
+
     return Scaffold(
       body: Center(
         child: Column(children: [
@@ -19,13 +28,6 @@ class StartScreen extends StatelessWidget {
             ),
           ),
 
-          // FadeInImage(
-          //   placeholder: MemoryImage(kTransparentImage),
-          //   image: NetworkImage(meal.imageUrl),
-          //   height: 200,
-          //   width: double.infinity,
-          //   fit: BoxFit.cover,
-          // ),
           SizedBox(
             // margin: const EdgeInsets.all(100),
             width: 280,
@@ -70,10 +72,9 @@ class StartScreen extends StatelessWidget {
                             fontSize: 20, fontWeight: FontWeight.w500),
                       ),
                       onPressed: () {
-                        Navigator.push(
-                          context,
+                        Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (ctx) => const PhoneScreen(),
+                            builder: (context) => const PhoneScreen(),
                           ),
                         );
                       },

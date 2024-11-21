@@ -38,7 +38,7 @@ dependencies:
   google_fonts: ^6.2.1
   pinput: ^4.0.0
   otp_timer_button: ^1.1.1
-  mapbox_maps_flutter: ^2.0.0
+  mapbox_maps_flutter: ^2.3.0
   geolocator: ^12.0.0
   http: ^1.2.2
   get_storage: ^2.1.1
@@ -48,6 +48,9 @@ dependencies:
   flutter_background_service: ^5.0.10
   sliding_up_panel: ^2.0.0+1
   flutter_riverpod: ^2.5.3
+  get: ^4.6.6
+  text_scroll: ^0.2.0
+  sensors_plus: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -87,7 +90,8 @@ flutter:
     - assets/images/phone_screen_illustration.png
     - assets/icons/book_a_ride_icon.png
     - assets/icons/filter_rides_icon.png
-
+    - assets/icons/marker.png
+    - assets/icons/driver.png
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
 

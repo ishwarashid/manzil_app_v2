@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
 
 class DestinationAlertDialog extends ConsumerStatefulWidget {
@@ -14,11 +15,12 @@ class _DestinationAlertDialogState
     extends ConsumerState<DestinationAlertDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _destinationController;
+  final box = GetStorage();
 
   @override
   void initState() {
     super.initState();
-    final destination = ref.read(ridesFilterProvider) ?? '';
+    final destination = ref.read(ridesFilterProvider);
     _destinationController = TextEditingController(text: destination);
   }
 
@@ -37,7 +39,7 @@ class _DestinationAlertDialogState
 
   @override
   Widget build(BuildContext context) {
-    final destination = ref.watch(ridesFilterProvider) ?? '';
+    final destination = ref.watch(ridesFilterProvider);
 
     return AlertDialog(
       backgroundColor: Theme.of(context).colorScheme.primary,
@@ -87,6 +89,7 @@ class _DestinationAlertDialogState
             if (destination.isNotEmpty) {
               ref.read(ridesFilterProvider.notifier).setDestination('');
               _destinationController.clear();
+              box.remove("driver_destination");
             } else {
               Navigator.of(context).pop();
             }

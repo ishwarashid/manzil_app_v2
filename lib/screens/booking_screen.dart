@@ -1,20 +1,46 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/screens/find_drivers.dart';
-import 'package:manzil_app_v2/screens/ride_requests.dart';
 import 'package:manzil_app_v2/widgets/main_drawer.dart';
 import 'package:manzil_app_v2/widgets/map.dart';
 import 'package:manzil_app_v2/widgets/ride_inputs.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
+import 'package:http/http.dart' as http;
+import '../providers/booking_inputs_provider.dart';
 
-class Booking extends StatefulWidget {
+class Booking extends ConsumerStatefulWidget {
   const Booking({super.key});
 
   @override
-  State<Booking> createState() => _BookingState();
+  ConsumerState<Booking> createState() => _BookingState();
 }
 
-class _BookingState extends State<Booking> {
+void updateUserPoints(String id, dynamic payload) async {
+  const url = "https://shrimp-select-vertically.ngrok-free.app";
+
+  await http.patch(
+    Uri.parse("$url/users/$id"),
+    headers: <String, String>{
+      'Content-Type': 'application/json; charset=UTF-8',
+    },
+    body: jsonEncode(payload)
+  );
+}
+
+class _BookingState extends ConsumerState<Booking> {
+  final box = GetStorage();
+
   void _goToFindDriversScreen() {
+    Map<String, dynamic> payload = {
+      "startPoint": box.read("pickup_coordinates"),
+      "endPoint": box.read("destination_coordinates")
+    };
+
+    updateUserPoints(box.read("_id"), payload);
+    box.write("hasRequested", true);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -25,10 +51,14 @@ class _BookingState extends State<Booking> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       drawer: const MainDrawer(),
       body: SafeArea(
         child: SlidingUpPanel(
+          onPanelOpened: () async => ref.read(bookingInputsProvider.notifier).setPickup(await box.read("pickup")),
+          minHeight: 50,
+          backdropOpacity: 0,
           panel: Center(
             child: RideInputs(onFindDrivers: _goToFindDriversScreen),
           ),
@@ -46,7 +76,7 @@ class _BookingState extends State<Booking> {
                 "Slide up to fill the ride details",
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onPrimary,
-                  fontSize: 18,
+                  fontSize: 14,
                 ),
               ),
             ),

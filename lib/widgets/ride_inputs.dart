@@ -1,10 +1,13 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/widgets/input_destination.dart';
 import 'package:manzil_app_v2/widgets/input_fare.dart';
 import 'package:manzil_app_v2/widgets/input_pickup.dart';
+import 'package:http/http.dart' as http;
+import 'package:text_scroll/text_scroll.dart';
 import '../providers/booking_inputs_provider.dart';
 import '../widgets/input_seats.dart';
 
@@ -54,11 +57,35 @@ class _RideInputsState extends ConsumerState<RideInputs> {
     );
   }
 
+
+  void sendRequest(payload) async {
+      const url = "https://shrimp-select-vertically.ngrok-free.app";
+
+      await http.post(
+          Uri.parse("$url/sendrequest"),
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+          body: jsonEncode(payload)
+      );
+  }
+
   void _bookRide() {
+    final box = GetStorage();
     Map<String, Object> bookingInfo = ref.read(bookingInputsProvider);
     //////////////////////////////////////////////////////////////////
     /////////////// SAVE BOOKING INFO IN DB HERE BISH////////////////
     ////////////////////////////////////////////////////////////////
+    Map<String, dynamic> payload = {
+      'userId': box.read("_id"),
+      'pickup': box.read("pickup").toString().trim(),
+      'destination': box.read("destination").toString().trim(),
+      'seats': bookingInfo['seats'].toString(),
+      'fare': bookingInfo['fare'].toString()
+    };
+
+    sendRequest(payload);
+
     ref.read(bookingInputsProvider.notifier).resetBookingInputs();
     widget.onFindDrivers();
   }
@@ -86,7 +113,6 @@ class _RideInputsState extends ConsumerState<RideInputs> {
                 InkWell(
                   // onTap: _openPickupModalOverlay,
                   onTap: () {
-                    print("InkWell tapped");
                     _openPickupModalOverlay();
                   },
                   child: Row(
@@ -101,14 +127,19 @@ class _RideInputsState extends ConsumerState<RideInputs> {
                         width: 10,
                       ),
                       Expanded(
-                        child: Text(
-                          pickup.isNotEmpty
-                              ? pickup
-                              : "No Pickup Location Specified",
+                        child: TextScroll(
+                            pickup.isNotEmpty
+                                ? pickup
+                                : "No Pickup Location Specified",
                           style: const TextStyle(fontSize: 18),
-                          softWrap: true,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        // child: Text(
+                        //   pickup.isNotEmpty
+                        //       ? pickup
+                        //       : "No Pickup Location Specified",
+                        //   style: const TextStyle(fontSize: 18),
+                        //   softWrap: true,
+                        //   maxLines: 1,
+                        //   overflow: TextOverflow.ellipsis,
                         ),
                       )
                     ],

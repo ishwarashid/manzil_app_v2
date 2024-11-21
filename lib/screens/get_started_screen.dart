@@ -1,7 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:manzil_app_v2/screens/home_screen.dart';
 
 class GetStartedScreen extends StatefulWidget {
@@ -173,8 +174,11 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                               onPressed: () {
                                 _saveData().then((value)=>{
                                   if(value == 200){
-                                    Navigator.pushReplacement(context,
-                                    MaterialPageRoute(builder: (context)=> const HomeScreen()))
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(
+                                        builder: (context) => const HomeScreen(),
+                                      )
+                                    )
                                   }
                                 });
                               },

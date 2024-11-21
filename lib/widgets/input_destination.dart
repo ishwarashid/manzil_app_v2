@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:get_storage/get_storage.dart';
+import 'package:http/http.dart' as http;
 import '../providers/booking_inputs_provider.dart';
 
 class InputDestination extends ConsumerStatefulWidget {
@@ -22,12 +25,28 @@ class _InputDestinationState extends ConsumerState<InputDestination> {
     _enteredDestination = bookingInputs["destination"] as String? ?? '';
   }
 
+  void getLocationCoordinates(String searchText) async {
+    final box = GetStorage();
+    String url = "https://nominatim.openstreetmap.org/search.php?q=%27${searchText.trim()}%27&format=jsonv2";
+
+    final response = await http.get(
+        Uri.parse(url),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        });
+    var geocodedData = jsonDecode(response.body) as List<dynamic>;
+
+    box.write("destination", searchText);
+    box.write("destination_coordinates", {"lat": geocodedData[0]["lat"], "lon": geocodedData[0]["lon"]});
+  }
+
   void _saveDestination() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       ref
           .read(bookingInputsProvider.notifier)
           .setDestination(_enteredDestination);
+      getLocationCoordinates(_enteredDestination);
       Navigator.pop(context);
     }
   }

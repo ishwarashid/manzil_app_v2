@@ -1,9 +1,13 @@
-import 'dart:ffi';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
+import 'package:manzil_app_v2/screens/user_chat_screen.dart';
+import 'package:manzil_app_v2/services/socket_handler.dart';
 import 'package:manzil_app_v2/widgets/destination_alert_dialog.dart';
+import 'package:http/http.dart' as http;
 
 class RideRequestsScreen extends ConsumerStatefulWidget {
   const RideRequestsScreen({super.key});
@@ -16,35 +20,57 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   ////////////////////////////////////////////
   ///////// GET THIS DYNAMICALLY TOO ////////
   //////////////////////////////////////////
+  final List<dynamic> ridesData = [];
 
-  List<Map<String, Object>> getRidesData() {
-    final List<Map<String, String>> ridesData = [
-      {
-        "passengerName": "John Doe",
-        "pickupLocation": "Tariq Bin Ziad Colony",
-        "destination": "COMSATS University, Sahiwal"
-      },
-      {
-        "passengerName": "Jane Smith",
-        "pickupLocation": "Tariq Bin Ziad Colony",
-        "destination": "COMSATS University, Sahiwal"
-      },
-      {
-        "passengerName": "Michael Lee",
-        "pickupLocation": "Tariq Bin Ziad Colony",
-        "destination": "COMSATS University, Sahiwal"
-      },
-      {
-        "passengerName": "Emily Davis",
-        "pickupLocation": "Tariq Bin Ziad Colony",
-        "destination": "Farid Town, Sahiwal"
-      },
-    ];
+  final box = GetStorage();
 
-    return ridesData;
+  Future<List<dynamic>> getRequests() async {
+      final box = GetStorage();
+      String destination = box.read("driver_destination").toString().trim();
+
+      const url = "https://shrimp-select-vertically.ngrok-free.app";
+
+      final response = await http.get(
+          Uri.parse("$url/requests?destination=$destination"),
+          headers: <String, String>{
+            'Content-Type': 'application/json; charset=UTF-8',
+          },
+      );
+      final requestData = jsonDecode(response.body) as Map<String, dynamic>;
+      final requests = List.castFrom(requestData['data']);
+      return requests;
+  }
+
+  void acceptRequest(String id, String userId) async {
+    const url = "https://shrimp-select-vertically.ngrok-free.app";
+
+    await http.patch(
+      Uri.parse("$url/accept-request/$id"),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        "acceptedBy": userId
+      })
+    );
+  }
+
+  void getRidesData() {
+
+    getRequests().then((requests){
+      if (mounted) {
+        setState(() {
+          ridesData.clear();
+          ridesData.addAll(requests);
+        });
+      }
+    });
   }
 
   void _showDestinationInputDialog() {
+    if(box.read('driver_destination')!=null){
+      ref.read(ridesFilterProvider.notifier).setDestination(box.read('driver_destination'));
+    }
     showDialog(
       context: context,
       builder: (BuildContext ctx) {
@@ -56,28 +82,31 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   @override
   void initState() {
     super.initState();
-    final enteredDestination = ref.read(ridesFilterProvider) ?? '';
+    final enteredDestination = ref.read(ridesFilterProvider);
     if (enteredDestination.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showDestinationInputDialog();
       });
     }
+
+    getRidesData();
   }
 
   @override
   Widget build(BuildContext context) {
-    final enteredDestination = ref.watch(ridesFilterProvider) ?? '';
+    var filteredRequests = ridesData;
 
-    final rideRequests = getRidesData();
+    SocketHandler.socket.on("Fetch Requests", (payload){
+      getRidesData();
+      filteredRequests = ridesData;
+    });
 
-    final filteredRequests = enteredDestination.isEmpty
-        ? rideRequests
-        : rideRequests.where((ride) {
-            final destination = ride['destination'] as String;
-            return destination
-                .toLowerCase()
-                .contains(enteredDestination.toLowerCase());
-          }).toList();
+    box.listenKey("driver_destination", (value){
+      getRidesData();
+      filteredRequests = ridesData;
+    });
+
+    String driverId = box.read("_id").toString();
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -148,6 +177,28 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
               itemCount: filteredRequests.length,
               itemBuilder: (context, index) {
                 final request = filteredRequests[index];
+                // if(request["requestedBy"]["_id"] == box.read("_id")){
+                //   return null;
+                // }
+                if(filteredRequests.isEmpty){
+                  return const Center(
+                      child: Text("No ride requests found")
+                  );
+                }
+
+                bool isAccepted = false;
+
+                List.castFrom(request["acceptedBy"]).forEach((driver){
+                  if(driver["driver"]["_id"] == driverId){
+                    isAccepted = true;
+                    return;
+                  }
+                });
+
+                if(isAccepted){
+                  return null;
+                }
+
                 return Card(
                   color: Theme.of(context).colorScheme.primaryContainer,
                   margin: const EdgeInsets.symmetric(vertical: 10),
@@ -160,7 +211,7 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              (request["passengerName"] as String),
+                              ("${request["requestedBy"]["firstName"] as String} ${request["requestedBy"]["lastName"] as String}"),
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
@@ -172,7 +223,17 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
                                 Icons.message,
                                 color: Color.fromARGB(255, 255, 170, 42),
                               ),
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => UserChatScreen(
+                                      fullName: "${request["requestedBy"]["firstName"] as String} ${request["requestedBy"]["lastName"] as String}",
+                                      receiverId: request["requestedBy"]["_id"],
+                                    ),
+                                  ),
+                                );
+                              },
                             )
                           ],
                         ),
@@ -188,11 +249,35 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
                             const SizedBox(
                               width: 5,
                             ),
-                            Text(
-                              (request["pickupLocation"] as String),
-                              style: const TextStyle(fontSize: 14),
-                              softWrap: true,
-                              overflow: TextOverflow.ellipsis,
+                            Flexible(
+                              child: Text(
+                                (request["pickup"] as String),
+                                style: const TextStyle(fontSize: 14),
+                                softWrap: true,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(
+                          height: 10,
+                        ),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.navigation,
+                              color: Color.fromARGB(255, 255, 107, 74),
+                            ),
+                            const SizedBox(
+                              width: 5,
+                            ),
+                            Flexible(
+                              child: Text(
+                                (request["destination"] as String),
+                                style: const TextStyle(fontSize: 14),
+                                softWrap: true,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
@@ -202,7 +287,7 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
                               child: Row(
                                 children: [
                                   const Icon(
-                                    Icons.navigation,
+                                    Icons.currency_exchange,
                                     color: Color.fromARGB(255, 255, 170, 42),
                                   ),
                                   const SizedBox(
@@ -210,7 +295,28 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
                                   ),
                                   Flexible(
                                     child: Text(
-                                      (request["destination"] as String),
+                                      (request["fare"].toString()),
+                                      style: const TextStyle(fontSize: 14),
+                                      softWrap: true,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.event_seat,
+                                    color: Color.fromARGB(255, 255, 107, 74),
+                                  ),
+                                  const SizedBox(
+                                    width: 5,
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      (request["seats"].toString()),
                                       style: const TextStyle(fontSize: 14),
                                       softWrap: true,
                                       overflow: TextOverflow.ellipsis,
@@ -220,19 +326,30 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
                               ),
                             ),
                             const SizedBox(
-                              width: 20,
+                              width: 60,
                             ),
-                            ElevatedButton(
-                              onPressed: () {},
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primary,
-                                foregroundColor:
-                                    Theme.of(context).colorScheme.onPrimary,
-                                textStyle: const TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w500),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 10.0),
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if(isAccepted){
+                                    return;
+                                  }
+                                  acceptRequest(request['_id'], box.read("_id"));
+                                  setState(() {
+                                    ridesData.remove(request);
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      Theme.of(context).colorScheme.primary,
+                                  foregroundColor:
+                                      Theme.of(context).colorScheme.onPrimary,
+                                  textStyle: const TextStyle(
+                                      fontSize: 16, fontWeight: FontWeight.w500),
+                                ),
+                                child: const Text("Accept"),
                               ),
-                              child: const Text("Accept"),
                             )
                           ],
                         ),

@@ -8,10 +8,10 @@ import 'package:pinput/pinput.dart';
 import '../main.dart';
 
 class OtpScreen extends StatefulWidget {
-  const OtpScreen(
-      {super.key,
-      required this.phoneNumber,
-      });
+  const OtpScreen({
+    super.key,
+    required this.phoneNumber,
+  });
 
   final String phoneNumber;
 
@@ -34,91 +34,40 @@ class _OtpScreenState extends State<OtpScreen> {
     return widget.phoneNumber;
   }
 
-  void _sendCode() async {
-    try {
-      const url = "https://shrimp-select-vertically.ngrok-free.app";
-      final response = await http.post(
-        Uri.parse('$url/sendotp'),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, String>{
-          'phone': getPhoneNumber(),
-        }),
-      );
+  Future<int> _sendCode() async {
+    const url = "https://shrimp-select-vertically.ngrok-free.app";
+    final response = await http.post(
+      Uri.parse('$url/sendotp'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        'phone': getPhoneNumber(),
+      }),
+    );
 
-      if (response.statusCode == 200) {
-        setState(() {
-          _isProcessing = false;
-        });
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) =>
-                OtpScreen(phoneNumber: getPhoneNumber()),
-          ),
-        );
-      } else {
-        throw Exception('Failed to send otp.');
-      }
-
-    } catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error Occurred: ${e.toString()}"),
-        ),
-      );
-    }
+    return response.statusCode;
   }
 
-  void _signIn() async {
-    try {
-      const url = "https://shrimp-select-vertically.ngrok-free.app";
-      final response = await http.post(
-        Uri.parse('$url/verifyotp'),
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, String>{
-          'phone': getPhoneNumber(),
-          'otp': _pinController.text
-        }),
-      );
+  Future<int> _signIn() async {
+    const url = "https://shrimp-select-vertically.ngrok-free.app";
+    final response = await http.post(
+      Uri.parse('$url/verifyotp'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, String>{
+        'phone': getPhoneNumber(),
+        'otp': _pinController.text
+      }),
+    );
 
-      if (response.statusCode == 200) {
-        setState(() {
-          _isProcessing = false;
-        });
-
-        final box = GetStorage();
-        box.write('phoneNumber', getPhoneNumber());
-
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const MyApp(),
-          ),
-        );
-      } else {
-        throw Exception('Failed to verify OTP. Please try again.');
-      }
-    } catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-        ),
-      );
-    }
+    return response.statusCode;
   }
 
   @override
   Widget build(BuildContext context) {
+
     final defaultPinTheme = PinTheme(
       width: 56,
       height: 56,
@@ -190,13 +139,41 @@ class _OtpScreenState extends State<OtpScreen> {
                             setState(() {
                               _isProcessing = true;
                             });
-                            _signIn();
+                            _signIn().then((statusCode) {
+                              if (statusCode == 200) {
+                                setState(() {
+                                  _isProcessing = false;
+                                });
+
+                                final box = GetStorage();
+
+                                box.write('phoneNumber', getPhoneNumber());
+
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(
+                                    builder: (context) => const MyApp(),
+                                  ),
+                                );
+                              } else {
+                                setState(() {
+                                  _isProcessing = false;
+                                });
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text(
+                                          "Failed to verify OTP. Please try again.")),
+                                );
+                              }
+                            });
                           },
                     child: _isProcessing
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                            child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white)),
                           )
                         : const Text("Verify"),
                   ),
@@ -208,7 +185,29 @@ class _OtpScreenState extends State<OtpScreen> {
               OtpTimerButton(
                 controller: _otpController,
                 onPressed: () {
-                  _sendCode();
+                  _sendCode().then((statusCode) {
+                    if (statusCode == 200) {
+                      setState(() {
+                        _isProcessing = false;
+                      });
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              OtpScreen(phoneNumber: getPhoneNumber()),
+                        ),
+                      );
+                    } else {
+                      setState(() {
+                        _isProcessing = false;
+                      });
+                      ScaffoldMessenger.of(context).clearSnackBars();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Error Occurred: Failed to send otp."),
+                        ),
+                      );
+                    }
+                  });
                 },
                 text: const Text(
                   'Resend OTP',
