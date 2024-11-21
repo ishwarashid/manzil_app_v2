@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="mapbox_access_token" translatable="false" tools:ignore="UnusedResources">--dart-define=ACCESS_TOKEN=sk.eyJ1IjoiYXphbjAwMSIsImEiOiJjbTIzZ3dxZTgwNG5sMmpxdXJ6YmhwZHR4In0.8SwW3Ap2Hau5MFfBGa3Vmg</string>
+</resources>
