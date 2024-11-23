@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:get_storage/get_storage.dart';
 
 class UserActivityScreen extends StatelessWidget {
-  const UserActivityScreen({super.key});
+  UserActivityScreen({super.key});
 
   ///////////////////////////////////
   // HAVE TO GET THESE DYNAMICALLY//
   /////////////////////////////////
   final hasBookedRide = true;
   final hasConfirmedDriver = true;
-
+  final box = GetStorage();
   ////////////////////////////////////////
   // AND ALSO CURRENTLY BOOKED RIDE DATA//
   ///////////////////////////////////////
@@ -29,7 +30,7 @@ class UserActivityScreen extends StatelessWidget {
       ),
     );
 
-    if (hasBookedRide) {
+    if (box.read("canNavigate") == null && !box.read("canNavigate")) {
       activity = SingleChildScrollView(
         child: Column(
           children: [
@@ -42,39 +43,39 @@ class UserActivityScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "You booked a ride at 2pm today",
-                      style: TextStyle(
+                    Text(
+                      "You have ${box.read("hasRequested") ? "Requested" : "Booked"} a ride",
+                      style: const TextStyle(
                           fontSize: 18,
                           color: Color.fromRGBO(30, 60, 87, 1),
                           fontWeight: FontWeight.w600),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.location_on_outlined,
                           color: Color.fromARGB(255, 255, 107, 74),
                         ),
-                        SizedBox(width: 5),
+                        const SizedBox(width: 5),
                         Text(
-                          "Tariq Bin Ziad Colony",
-                          style: TextStyle(fontSize: 16),
+                            box.read("pickup") != null ? box.read("pickup").toString() : "No pickup location",
+                          style: const TextStyle(fontSize: 16),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.navigation,
                           color: Color.fromARGB(255, 255, 170, 42),
                         ),
-                        SizedBox(width: 5),
+                        const SizedBox(width: 5),
                         Text(
-                          "Comsats University Sahiwal",
-                          style: TextStyle(fontSize: 16),
+                          box.read("destination") != null ? box.read("destination").toString() : "No destination location",
+                          style: const TextStyle(fontSize: 16),
                         ),
                       ],
                     ),
@@ -89,9 +90,7 @@ class UserActivityScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          hasConfirmedDriver
-                              ? "Haider Ali"
-                              : "Yet to be confirmed",
+                            box.read("driver_name") ?? "Yet to be confirmed",
                           style: TextStyle(
                               fontSize: 16,
                               color: hasConfirmedDriver
@@ -108,6 +107,13 @@ class UserActivityScreen extends StatelessWidget {
             ),
           ],
         ),
+      );
+    }
+    else{
+      activity = const Padding(
+        padding: EdgeInsets.only(top: 10),
+        child: Center(
+            child: Text("You have not requested or booked a ride yet!", style: TextStyle(fontSize: 18), textAlign: TextAlign.center)),
       );
     }
 

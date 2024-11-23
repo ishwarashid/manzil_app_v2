@@ -52,6 +52,27 @@ class ChatService {
 
   }
 
+  Future<Map<String, dynamic>> getRide() async {
+    String userId = box.read("_id");
+    final response = await http.get(
+      Uri.parse('$url/ride-users/$userId'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    );
+
+    if(response.statusCode == 404){
+      return {};
+    }
+
+    final rideData = jsonDecode(response.body) as Map<String, dynamic>;
+
+    final ride = rideData["data"];
+
+    return ride;
+
+  }
+
   // send message
   Future<void> sendMessage(String receiverId, message) async {
     final currentUserId = box.read("_id");

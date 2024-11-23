@@ -126,7 +126,7 @@ class MainDrawer extends StatelessWidget {
               ) : Container(),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
-                  child: (box.read("isBooked") == null || box.read("isBooked")) ? ListTile(
+                  child: (box.read("isBooked") != null && box.read("isBooked")) ? ListTile(
                     title: Text(
                       "Map",
                       style: TextStyle(

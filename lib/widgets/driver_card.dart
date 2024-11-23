@@ -65,7 +65,13 @@ class DriverCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      "${driver["distance"]} away",
+                      "${num.parse(driver["distance"].toString()).round()} meters far",
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                    Text(
+                      "${num.parse(driver["duration"].toString()).round()} mins",
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.secondary,
                       ),
@@ -106,8 +112,9 @@ class DriverCard extends StatelessWidget {
                           builder: (context) => const PassengerMapScreen(),
                         ),
                       );
-
+                      box.write("hasRequested", false);
                       box.write("isBooked", true);
+                      box.write("driver_name", driver["driverName"]);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,

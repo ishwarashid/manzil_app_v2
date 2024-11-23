@@ -51,6 +51,7 @@ dependencies:
   get: ^4.6.6
   text_scroll: ^0.2.0
   sensors_plus: ^6.1.0
+  turf: ^0.0.10
 
 dev_dependencies:
   flutter_test:

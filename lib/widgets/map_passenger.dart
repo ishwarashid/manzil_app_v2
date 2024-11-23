@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import 'package:geolocator/geolocator.dart' as geolocator;
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:manzil_app_v2/screens/home_screen.dart';
+import 'package:manzil_app_v2/services/chat/chat_services.dart';
 import 'package:manzil_app_v2/services/socket_handler.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -23,13 +25,15 @@ class FullPassengerMap extends ConsumerStatefulWidget {
 class FullPassengerMapState extends ConsumerState<FullPassengerMap> {
   MapboxMap? mapboxMap;
 
+  ChatService chatService = ChatService();
+
   bool isPickedUp = false;
 
   PointAnnotationManager? pointAnnotationManager;
 
   final box = GetStorage();
   Point _driverPoint = Point(coordinates: Position(0.0, 0.0));
-
+  var driverDistance = 0.0;
   double _azimuth = 0.0;
   double _previousAzimuth = 0.0;
   final double _threshold = 5.0; // Set your threshold (in degrees)
@@ -63,9 +67,18 @@ class FullPassengerMapState extends ConsumerState<FullPassengerMap> {
   void initState() {
     SocketHandler.socket.on("Driver_Location", (value) {
       if (box.read("_id") != value["id"] && !isPickedUp) {
+
         _driverPoint =  Point(
             coordinates:
             Position(value["lng"] as num, value["lat"] as num));
+
+        String lat1 = box.read("pickup_coordinates")["lat"].toString();
+        String lng1 = box.read("pickup_coordinates")["lon"].toString();
+
+        getDistance(lng1, lat1, _driverPoint.coordinates.lng.toString(), _driverPoint.coordinates.lat.toString())
+            .then((response){
+           driverDistance = response["distance"];
+        });
 
         _addDriverLocation(
             _driverPoint,
@@ -188,6 +201,25 @@ class FullPassengerMapState extends ConsumerState<FullPassengerMap> {
     );
   }
 
+  Future<Map<String, dynamic>> getDistance(String long1, String lat1, String long2, String lat2) async {
+
+    String url = "https://api.mapbox.com/directions/v5/mapbox/driving/$long1%2C$lat1%3B$long2%2C$lat2?alternatives=false&geometries=geojson&language=en&overview=full&steps=true&access_token=${const String.fromEnvironment("ACCESS_TOKEN")}";
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    );
+
+    var geocodedData = jsonDecode(response.body) as Map<String, dynamic>;
+
+    return {
+      "distance": geocodedData["routes"][0]["distance"],
+      "duration": geocodedData["routes"][0]["duration"]
+    };
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -221,14 +253,14 @@ class FullPassengerMapState extends ConsumerState<FullPassengerMap> {
     });
 
     getUser().then((user){
-      if(user["isPickedUp"].toString() == "true"){
+      if(user["isPickedUp"]){
         setState(() {
           isPickedUp = true;
         });
       }
       else{
         setState(() {
-          isPickedUp = true;
+          isPickedUp = false;
         });
       }
     });
@@ -243,7 +275,7 @@ class FullPassengerMapState extends ConsumerState<FullPassengerMap> {
         ),
         if(_driverPoint.coordinates.every((coordinate){ return coordinate != 0; }))
           Positioned(
-            bottom: 320,
+            bottom: 290,
             right: 20,
             child: Builder(
               builder: (context) =>
@@ -317,6 +349,44 @@ class FullPassengerMapState extends ConsumerState<FullPassengerMap> {
           ),
         ),
         Positioned(
+          bottom: 220,
+          left: 20,
+          child: Builder(
+            builder: (context) => CircleAvatar(
+              radius: 30,
+              backgroundColor: Colors.red,
+              child: IconButton(
+                icon: Icon(
+                  Icons.emergency_share_rounded,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  size: 30,
+                ),
+                onPressed: () {
+                  chatService.getRide().then((ride){
+                    SocketHandler.socket.emit("Emergency", ride);
+                  });
+
+                  showCupertinoDialog(
+                      barrierDismissible: false,
+                      context: context,
+                      builder: (_) {
+                        Future.delayed(const Duration(seconds: 2), () {
+                          Navigator.of(context).pop(true);
+                        });
+
+                        return const AlertDialog(
+                          title: Text("Emergency Alert Sent!"),
+                          icon: Icon(Icons.emergency_share_rounded),
+                          iconColor: Colors.red,
+                        );
+                      }
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        Positioned(
           bottom: 0,
           right: 0,
           left: 0,
@@ -339,8 +409,8 @@ class FullPassengerMapState extends ConsumerState<FullPassengerMap> {
                        style: TextStyle(fontSize: 18, color: Colors.white)
                    ),
                   const SizedBox(height: 10),
-                  const Text("2 mins away",
-                      style: TextStyle(fontSize: 14, color: Colors.white)
+                  Text("${driverDistance.round()} meters far",
+                      style: const TextStyle(fontSize: 14, color: Colors.white)
                   ),
                   const SizedBox(height: 10),
 
@@ -375,6 +445,7 @@ class FullPassengerMapState extends ConsumerState<FullPassengerMap> {
                   ElevatedButton(
                       onPressed: () {
                         SocketHandler.socket.emit("Completed Ride", box.read("_id"));
+                        box.write("isBooked", false);
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(

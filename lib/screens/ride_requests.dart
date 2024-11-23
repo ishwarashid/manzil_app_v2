@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
 import 'package:manzil_app_v2/screens/user_chat_screen.dart';
 import 'package:manzil_app_v2/services/socket_handler.dart';
 import 'package:manzil_app_v2/widgets/destination_alert_dialog.dart';
-import 'package:http/http.dart' as http;
 
 class RideRequestsScreen extends ConsumerStatefulWidget {
   const RideRequestsScreen({super.key});
@@ -79,6 +79,32 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
     );
   }
 
+  void getCoordinatesForDriverDestination(String searchText) async {
+    final box = GetStorage();
+    String url = "https://nominatim.openstreetmap.org/search.php?q=%27${searchText.trim()}%27&format=jsonv2";
+
+    final response = await http.get(
+        Uri.parse(url),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        });
+    var geocodedData = jsonDecode(response.body) as List<dynamic>;
+
+    box.write("driver_destination_coordinates", {"lat": geocodedData[0]["lat"], "lon": geocodedData[0]["lon"]});
+  }
+
+  void updateUserPoints(String id, dynamic payload) async {
+    const url = "https://shrimp-select-vertically.ngrok-free.app";
+
+    await http.patch(
+        Uri.parse("$url/users/$id"),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(payload)
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -102,6 +128,19 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
     });
 
     box.listenKey("driver_destination", (value){
+      if(value == null || value.toString().isEmpty){
+        return;
+      }
+
+      getCoordinatesForDriverDestination(value);
+
+      Map<String, dynamic> payload = {
+        "startPoint": null,
+        "endPoint": box.read("driver_destination_coordinates")
+      };
+
+      updateUserPoints(box.read("_id"), payload);
+
       getRidesData();
       filteredRequests = ridesData;
     });
@@ -172,31 +211,44 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
           const SizedBox(
             height: 20,
           ),
+          (filteredRequests.isEmpty) ?
+            const Padding(
+            padding: EdgeInsets.only(top: 250),
+            child: Center(
+            child: Text("No ride requests found\nTry changing the filter", style: TextStyle(fontSize: 18), textAlign: TextAlign.center)),)
+              :
           Expanded(
             child: ListView.builder(
               itemCount: filteredRequests.length,
               itemBuilder: (context, index) {
-                final request = filteredRequests[index];
-                // if(request["requestedBy"]["_id"] == box.read("_id")){
-                //   return null;
-                // }
+
                 if(filteredRequests.isEmpty){
-                  return const Center(
-                      child: Text("No ride requests found")
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 250),
+                    child: Center(
+                          child: Text("No ride requests found\nTry changing the filter", style: TextStyle(fontSize: 18), textAlign: TextAlign.center)),
                   );
                 }
-
+                final request = filteredRequests[index];
+                if(request["requestedBy"]["_id"] == box.read("_id")){
+                  return null;
+                }
                 bool isAccepted = false;
 
                 List.castFrom(request["acceptedBy"]).forEach((driver){
                   if(driver["driver"]["_id"] == driverId){
                     isAccepted = true;
+                    filteredRequests.remove(request);
                     return;
                   }
                 });
 
                 if(isAccepted){
-                  return null;
+                  return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.only(top: 250),
+                          child: Text("No ride requests found\nTry changing the filter", style: TextStyle(fontSize: 18), textAlign: TextAlign.center),
+                        ));
                 }
 
                 return Card(

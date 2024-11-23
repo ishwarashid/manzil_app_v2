@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geolocator;
 import 'package:get/get.dart';
@@ -95,6 +96,35 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void updateUserPoints(String id, dynamic payload) async {
+    const url = "https://shrimp-select-vertically.ngrok-free.app";
+
+    await http.patch(
+        Uri.parse("$url/users/$id"),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(payload)
+    );
+  }
+
+  void getAcceptedRequests(String id) async {
+    const url = "https://shrimp-select-vertically.ngrok-free.app";
+
+    final response = await http.get(
+      Uri.parse("$url/accepted-requests/$id"),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+    );
+    final requestData = jsonDecode(response.body) as Map<String, dynamic>;
+    final requests = List.castFrom(requestData['data']);
+
+    if(requests.isNotEmpty){
+      box.write("hasRequested", true);
+    }
+  }
+
   @override
   void initState() {
     final ChatService chatService = ChatService();
@@ -149,6 +179,14 @@ class _HomeScreenState extends State<HomeScreen> {
       getLocationForDriverPickup(
           position.longitude.toString(),
           position.latitude.toString());
+
+      Map<String, dynamic> payload = {
+        "startPoint": box.read("driver_pickup_coordinates"),
+        "endPoint": null
+      };
+
+      updateUserPoints(box.read("_id"), payload);
+
     });
 
 
@@ -176,14 +214,27 @@ class _HomeScreenState extends State<HomeScreen> {
       notificationPlugin.showNotification(msg);
 
       box.write("canNavigate", true);
+
+      if(box.read("passenger_names") == null || List.castFrom(box.read("passenger_names")).isEmpty){
+        box.write("passenger_names", List.of(user));
+      }
+      else if(box.read("passenger_names") == null && List.castFrom(box.read("passenger_names")).isEmpty){
+        List<dynamic> passengerNames = List.castFrom(box.read("passenger_names"));
+        passengerNames.add(user);
+
+        box.write("passenger_names", passengerNames);
+      }
+
     });
+
+    getAcceptedRequests(box.read("_id"));
 
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget activePage = const UserActivityScreen();
+    Widget activePage = UserActivityScreen();
     if (_selectedPageIndex == 1) {
       activePage = const RideRequestsScreen();
     }
@@ -196,6 +247,26 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: ElevatedButton.icon(
               onPressed: () {
+
+                if(box.read("isBooked") != null && box.read("isBooked")){
+                  showCupertinoDialog(
+                      barrierDismissible: false,
+                      context: context,
+                      builder: (_) {
+                        Future.delayed(const Duration(milliseconds: 500), () {
+                          Navigator.of(context).pop(true);
+                        });
+
+                        return const AlertDialog(
+                          title: Text("Ride Already Booked!"),
+                          icon: Icon(Icons.warning),
+                          iconColor: Colors.red,
+                        );
+                      }
+                  );
+                  return;
+                }
+
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => const Booking(),
