@@ -16,19 +16,7 @@ class UserActivityScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget activity = Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 300,
-            child: Image.asset(
-              'assets/images/no_activity_illustration.png',
-            ),
-          ),
-        ],
-      ),
-    );
+    Widget activity;
 
     if (box.read("canNavigate") == null && !box.read("canNavigate")) {
       activity = SingleChildScrollView(
