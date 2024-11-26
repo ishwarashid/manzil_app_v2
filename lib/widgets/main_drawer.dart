@@ -1,13 +1,21 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:manzil_app_v2/screens/chats_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:manzil_app_v2/main.dart';
+import 'package:manzil_app_v2/providers/current_user_provider.dart';
 
-class MainDrawer extends StatelessWidget {
-  const MainDrawer({super.key});
+
+class MainDrawer extends ConsumerWidget {
+  const MainDrawer({super.key, required this.onSelectScreen});
+
+  final void Function(String identifier) onSelectScreen;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final box = GetStorage();
+
+    final currentUser = ref.watch(currentUserProvider);
+
     return Drawer(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -18,8 +26,9 @@ class MainDrawer extends StatelessWidget {
                 decoration:
                     BoxDecoration(color: Theme.of(context).colorScheme.primary),
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 20),
+                  padding: const EdgeInsets.only(left: 20, right: 20),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.person,
@@ -29,56 +38,20 @@ class MainDrawer extends StatelessWidget {
                       const SizedBox(
                         width: 16,
                       ),
-                      StreamBuilder<DocumentSnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(FirebaseAuth.instance.currentUser!.uid)
-                            .snapshots(),
-                        builder: (BuildContext context, snapshot) {
-                          if (snapshot.hasError) {
-                            return Text('Error: ${snapshot.error}');
-                          }
-
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const CircularProgressIndicator(); // Show loading indicator while waiting for data
-                          }
-
-                          if (snapshot.hasData) {
-                            print(FirebaseAuth.instance.currentUser);
-                            final userData =
-                                snapshot.data!.data() as Map<String, dynamic>;
-                            final userName = userData['first_name'] +
-                                " " +
-                                userData["last_name"];
-                            return ClipRect(
-                              child: Text(
-                                userName,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onPrimary,
-                                  fontSize: 24,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            );
-                          } else {
-                            return Text(
-                              "Loading...",
-                              style: TextStyle(
-                                  color:
-                                      Theme.of(context).colorScheme.onPrimary,
-                                  fontSize: 24),
-                            );
-                          }
-                        },
-                      ),
-
-                      // Text(
-                      //   fullName,
-                      //   style: TextStyle(
-                      //       color: Theme.of(context).colorScheme.onPrimary,
-                      //       fontSize: 24),
-                      // ),
+                      Expanded(
+                        child: Text(
+                          (currentUser['first_name'] as String).isEmpty
+                              ? "Unknown"
+                              : currentUser['first_name'] as String,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: 24,
+                          ),
+                          softWrap: true,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )
                     ],
                   ),
                 ),
@@ -98,7 +71,7 @@ class MainDrawer extends StatelessWidget {
                     size: 30,
                   ),
                   onTap: () {
-                    Navigator.pop(context);
+                    onSelectScreen('home');
                   },
                 ),
               ),
@@ -117,13 +90,26 @@ class MainDrawer extends StatelessWidget {
                     size: 30,
                   ),
                   onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChatsScreen(),
-                      ),
-                    );
+                    onSelectScreen('chats');
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
+                child: ListTile(
+                  title: Text(
+                    "Found Drivers",
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 20),
+                  ),
+                  leading: Icon(
+                    Icons.home_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 30,
+                  ),
+                  onTap: () {
+                    onSelectScreen('foundDrivers');
                   },
                 ),
               ),
@@ -143,7 +129,15 @@ class MainDrawer extends StatelessWidget {
                 size: 30,
               ),
               onTap: () {
-                FirebaseAuth.instance.signOut();
+                box.erase();
+                ref.read(currentUserProvider.notifier).clearUser();
+                Navigator.of(context).pop();
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MyApp(),
+                  ),
+                );
               },
             ),
           ),

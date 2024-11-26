@@ -1,23 +1,22 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:manzil_app_v2/main.dart';
-import 'package:manzil_app_v2/screens/home_screen.dart';
-import 'package:manzil_app_v2/screens/get_started_screen.dart';
-import 'package:pinput/pinput.dart';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:manzil_app_v2/screens/get_started_screen.dart';
 import 'package:otp_timer_button/otp_timer_button.dart';
+import 'package:pinput/pinput.dart';
+
+import '../main.dart';
 
 class OtpScreen extends StatefulWidget {
-  const OtpScreen(
-      {super.key,
-      required this.vid,
-      required this.phoneNumber,
-      required this.resendToken});
+  const OtpScreen({
+    super.key,
+    required this.phoneNumber,
+  });
 
-  final String vid;
   final String phoneNumber;
-  final int? resendToken;
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -28,8 +27,7 @@ class _OtpScreenState extends State<OtpScreen> {
   final OtpTimerButtonController _otpController = OtpTimerButtonController();
   bool _isProcessing = false;
 
-  String _vid = '';
-  int? _resendToken = 0;
+  final String baseUrl = "https://shrimp-select-vertically.ngrok-free.app";
 
   @override
   void dispose() {
@@ -37,102 +35,36 @@ class _OtpScreenState extends State<OtpScreen> {
     super.dispose();
   }
 
-  // void isNumberAlreadyExist() async {}
-
-  // var code = '';
-  // void _savePhoneNumber() async {}
-
   String getPhoneNumber() {
     return widget.phoneNumber;
   }
 
-  String _getVid() {
-    if (_vid != '') {
-      return _vid;
-    }
-    return widget.vid;
-  }
-
-  int? _getResendToken() {
-    if (_resendToken != 0) {
-      return _resendToken;
-    }
-    return widget.resendToken;
-  }
-
-  Future<bool> _sendOTP(
-      {required String phoneNumber, required int? token}) async {
-    await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: phoneNumber,
-        verificationCompleted: (PhoneAuthCredential credential) {},
-        verificationFailed: (FirebaseAuthException e) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error Occurred: ${e.code}"),
-            ),
-          );
-        },
-        codeSent: (String vid, int? token) {
-          _vid = vid;
-          _resendToken = token;
-        },
-        timeout: const Duration(seconds: 25),
-        forceResendingToken: _resendToken,
-        codeAutoRetrievalTimeout: (vid) {});
-    return true;
-  }
-
-  void _signIn() async {
-    PhoneAuthCredential credentials = PhoneAuthProvider.credential(
-        verificationId: _getVid(), smsCode: _pinController.text);
-
+  Future<int> _sendCode() async {
     try {
-      final userCredentials =
-          await FirebaseAuth.instance.signInWithCredential(credentials);
-
-      final DocumentSnapshot document = await FirebaseFirestore.instance
-          .collection("users")
-          .doc(userCredentials.user!.uid)
-          .get();
-      if (!document.exists) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const GetStartedScreen(),
-          ),
-        );
-      } else {
-        Navigator.pop(context);
-        // Navigator.push(
-        //   context,
-        //   MaterialPageRoute(
-        //     builder: (context) => const MyApp(),
-        //   ),
-        // );
-
-        // Navigator.popUntil(context, ModalRoute.withName('/'));
-      }
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.code),
-        ),
+      final response = await http.post(
+        Uri.parse('$baseUrl/sendotp'),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({'phone': getPhoneNumber()}),
       );
+      return response.statusCode;
     } catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-        ),
+      debugPrint("Error sending OTP: $e");
+      return 500; // Consider this as a failure.
+    }
+  }
+
+  Future<int> _signIn() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/verifyotp'),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body:
+            jsonEncode({'phone': getPhoneNumber(), 'otp': _pinController.text}),
       );
+      return response.statusCode;
+    } catch (e) {
+      debugPrint("Error verifying OTP: $e");
+      return 500; // Consider this as a failure.
     }
   }
 
@@ -205,18 +137,77 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                     onPressed: _isProcessing
                         ? null
-                        : () {
-                            // print(_pinController.text);
+                        : () async {
                             setState(() {
                               _isProcessing = true;
                             });
-                            _signIn();
+
+                            final statusCode = await _signIn();
+
+                            setState(() {
+                              _isProcessing = false;
+                            });
+
+                            if (statusCode == 200) {
+                              final box = GetStorage();
+                              box.write('phoneNumber', getPhoneNumber());
+                              try {
+                                final QuerySnapshot querySnapshot =
+                                    await FirebaseFirestore.instance
+                                        .collection('users')
+                                        .where('phone_number',
+                                            isEqualTo: getPhoneNumber())
+                                        .limit(1)
+                                        .get();
+                                print(getPhoneNumber());
+                                print(querySnapshot.docs.first.data());
+
+                                if (querySnapshot.docs.isNotEmpty) {
+                                  print("isNotEmpty");
+                                  print(querySnapshot.docs.first.data());
+                                  Navigator.of(context).pop();
+                                  Navigator.of(context).pushReplacement(
+                                    MaterialPageRoute(
+                                      builder: (context) => const MyApp(),
+                                    ),
+                                  );
+                                } else {
+                                  // new user and also no phone number is saved, have to save everything
+                                  // print(querySnapshot.docs.first);
+                                  Navigator.of(context).pushReplacement(
+                                    MaterialPageRoute(
+                                      builder: (context) => GetStartedScreen(phoneNumber: getPhoneNumber(),),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(e.toString()),
+                                  ),
+                                );
+                              }
+                            } else {
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    statusCode == 400
+                                        ? "Failed to verify OTP. Please enter valid OTP."
+                                        : "Failed to verify OTP. Please try again.",
+                                  ),
+                                ),
+                              );
+                            }
                           },
                     child: _isProcessing
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(),
+                            child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white)),
                           )
                         : const Text("Verify"),
                   ),
@@ -227,36 +218,28 @@ class _OtpScreenState extends State<OtpScreen> {
               ),
               OtpTimerButton(
                 controller: _otpController,
-                onPressed: () {
-                  _sendOTP(
-                    phoneNumber: widget.phoneNumber,
-                    token: _getResendToken(),
-                  );
+                onPressed: () async {
+                  final statusCode = await _sendCode();
+
+                  if (statusCode == 200) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("OTP Resent Successfully")),
+                    );
+                    _otpController.startTimer();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Error Occurred: Failed to resend OTP"),
+                      ),
+                    );
+                  }
                 },
                 text: const Text(
                   'Resend OTP',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 duration: 30,
-              )
-
-              // TextButton(
-              //   onPressed: () {
-              //     _sendOTP(phoneNumber: widget.phoneNumber, token: _getResendToken());
-              //   },
-              //   child: const Text(
-              //     "Resend again",
-              //     style: TextStyle(
-              //       fontSize: 16,
-              //       fontWeight: FontWeight.w600,
-              //       // color: Color.fromARGB(255, 90, 90, 90),
-              //     ),
-              //     // style: TextButton.styleFrom(padding: EdgeInsets.zero)
-              //   ),
-              // ),
+              ),
             ],
           ),
         ),

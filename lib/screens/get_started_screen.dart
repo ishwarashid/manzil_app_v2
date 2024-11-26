@@ -1,9 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:manzil_app_v2/main.dart';
 
 class GetStartedScreen extends StatefulWidget {
-  const GetStartedScreen({super.key});
+  const GetStartedScreen({
+    super.key,
+    required this.phoneNumber,
+  });
+
+  final String phoneNumber;
 
   @override
   State<GetStartedScreen> createState() => _GetStartedScreenState();
@@ -15,27 +21,30 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
   var _lastName = '';
   var _emailAddress = '';
 
-  void _saveData() async{
+  void _saveData() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       print("inside save data");
       // print(FirebaseAuth.instance.currentUser!.uid);
       // print(FirebaseAuth.instance.currentUser!.phoneNumber);
-      await FirebaseFirestore.instance.collection("users").doc(FirebaseAuth.instance.currentUser!.uid).set({
-        "phone_number": FirebaseAuth.instance.currentUser!.phoneNumber,
+      await FirebaseFirestore.instance.collection("users").add({
+        "phone_number": widget.phoneNumber,
         "first_name": _firstName,
         "last_name": _lastName,
         "email": _emailAddress,
       });
-      Navigator.pop(context);
 
+      Navigator.of(context).pop();
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const MyApp(),
+        ),
+      );
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-
     final keyboardSpace = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
@@ -59,7 +68,8 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
               Form(
                   key: _formKey,
                   child: Padding(
-                    padding: EdgeInsets.only(left: 30, bottom: keyboardSpace, right: 30),
+                    padding: EdgeInsets.only(
+                        left: 30, bottom: keyboardSpace, right: 30),
                     child: Column(
                       children: [
                         TextFormField(

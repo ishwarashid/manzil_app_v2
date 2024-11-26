@@ -1,23 +1,95 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:manzil_app_v2/main.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:manzil_app_v2/providers/current_user_provider.dart';
+import 'package:manzil_app_v2/screens/booking.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
-import 'package:manzil_app_v2/screens/user_chat_screen.dart';
-import 'package:manzil_app_v2/widgets/chat_list.dart';
+import 'package:manzil_app_v2/screens/find_drivers.dart';
+import 'package:manzil_app_v2/screens/ride_requests.dart';
+import 'package:manzil_app_v2/screens/user_activity.dart';
 import 'package:manzil_app_v2/widgets/main_drawer.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  int _selectedPageIndex = 0;
+
+  String? phoneNumber;
+
+  void _selectPage(int index) {
+    setState(() {
+      _selectedPageIndex = index;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final box = GetStorage();
+    phoneNumber = box.read('phoneNumber');
+    _fetchUserData();
+  }
+
+  Future<void> _fetchUserData() async {
+    final currentUser = ref.read(currentUserProvider);
+
+    if (currentUser['first_name'] == '') {
+      try {
+        final QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .where('phone_number', isEqualTo: phoneNumber)
+            .limit(1)
+            .get();
+
+        if (querySnapshot.docs.isNotEmpty) {
+          final doc = querySnapshot.docs.first;
+
+          final userData = doc.data() as Map<String, dynamic>;
+
+          userData['uid'] = doc.id;
+
+          ref.read(currentUserProvider.notifier).setUser(userData);
+        }
+      } catch (e) {
+        // Handle error
+        print("Error fetching user data: $e");
+      }
+    }
+  }
+
+  void _setScreen(String identifier) async {
+    Navigator.of(context).pop();
+    if (identifier == 'chats') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (ctx) => const ChatsScreen(),
+        ),
+      );
+    } else if (identifier == 'foundDrivers') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (ctx) => const FindDrivers(),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    Widget activePage = const UserActivityScreen();
+
+    final currentUser = ref.watch(currentUserProvider);
+    // print(currentUser);
+
+    if (_selectedPageIndex == 1) {
+      activePage = const RideRequestsScreen();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -26,7 +98,14 @@ class _HomeScreenState extends State<HomeScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => const Booking(),
+                  ),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -44,201 +123,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      drawer: const MainDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 50, 20, 30),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Ride Requests Near You",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Color.fromRGBO(30, 60, 87, 1),
-              ),
-            ),
-            const SizedBox(
-              height: 10,
-            ),
-            Container(
-              width: 165,
-              height: 5,
-              decoration: BoxDecoration(
-                  color: const Color.fromRGBO(30, 60, 87, 1),
-                  borderRadius: BorderRadius.circular(5)),
-            ),
-            const SizedBox(
-              height: 30,
-            ),
-            Card(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Azan Rashid",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Color.fromARGB(255, 45, 45, 45),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.message,
-                          color: Color.fromARGB(255, 255, 170, 42),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ChatsScreen(),
-                            ),
-                          );
-
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => UserChatScreen(
-                                fullName: "Azan Rashid",
-                                receiverId: "egizs0ZIhiNGF6nZRaQnweF0chN2",
-                              ),
-                            ),
-                          );
-                          print("back from chat");
-
-                        },
-                      )
-                    ],
-                  ),
-                  const SizedBox(
-                    height: 8,
-                  ),
-                  const Row(
-                    children: [
-                      Icon(Icons.location_on_outlined,
-                          color: Color.fromARGB(255, 255, 107, 74),),
-                      Text("Tariq Bin Ziad Colony")
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Row(
-                          children: [
-                            Icon(Icons.navigation,
-                                color: Color.fromARGB(255, 255, 170, 42),),
-                            Text("COMSATS University"),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
-                          textStyle: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w500),
-                        ),
-                        child: const Text("Accept"),
-                      )
-                    ],
-                  ),
-                ]),
-              ),
-            ),
-            const SizedBox(
-              height: 20,
-            ),
-            Card(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Faraz Usman",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Color.fromARGB(255, 45, 45, 45),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.message,
-                          color: Color.fromARGB(255, 255, 170, 42),
-                        ),
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => UserChatScreen(
-                                fullName: "Faraz Usman",
-                                receiverId: "ooMvMYyqJqWmIxPmCQiMnz5nDQf1",
-                              ),
-                            ),
-                          );
-
-                          print("back from chat");
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ChatsScreen(),
-                            ),
-                          );
-                        },
-                      )
-                    ],
-                  ),
-                  const SizedBox(
-                    height: 8,
-                  ),
-                  const Row(
-                    children: [
-                      Icon(Icons.location_on_outlined,
-                          color: Color.fromARGB(255, 255, 107, 74),),
-                      Text("Tariq Bin Ziad Colony")
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Row(
-                          children: [
-                            Icon(Icons.navigation,
-                                color: Color.fromARGB(255, 255, 170, 42),),
-                            Text("COMSATS University"),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Theme.of(context).colorScheme.primary,
-                          foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
-                          textStyle: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w500),
-                        ),
-                        child: const Text("Accept"),
-                      )
-                    ],
-                  ),
-                ]),
-              ),
-            )
-          ],
-        ),
+      drawer: MainDrawer(onSelectScreen: _setScreen),
+      body: activePage,
+      bottomNavigationBar: BottomNavigationBar(
+        onTap: _selectPage,
+        currentIndex: _selectedPageIndex,
+        items: const [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.backup_table), label: "Activity"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.drive_eta_outlined), label: "Accept Requests"),
+        ],
       ),
     );
   }

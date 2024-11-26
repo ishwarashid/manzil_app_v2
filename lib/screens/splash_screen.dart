@@ -1,14 +1,32 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:manzil_app_v2/main.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:manzil_app_v2/screens/home_screen.dart';
+import 'package:manzil_app_v2/screens/start_screen.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
-
   @override
   Widget build(BuildContext context) {
+    final box = GetStorage();
+    String? phoneNumber = box.read('phoneNumber');
+\
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      Future.microtask(() {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const StartScreen()),
+        );
+      });
+    } else {
+      Future.microtask(() {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      });
+    }
+
     return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.primary,
         body: Center(

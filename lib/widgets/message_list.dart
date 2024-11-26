@@ -1,24 +1,21 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
 import 'package:manzil_app_v2/services/chat/chat_services.dart';
 import 'package:manzil_app_v2/widgets/message_bubble.dart';
 
 class MessageList extends StatelessWidget {
-  MessageList({super.key, required this.receiverId});
-
+  MessageList({super.key, required this.currentUser, required this.receiverId});
+  final Map<String, dynamic> currentUser; // User data from the provider
   final String receiverId;
-  final String senderId = FirebaseAuth.instance.currentUser!.uid;
   final ChatService _chatService = ChatService();
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: _chatService.getMessages(senderId, receiverId),
+      stream: _chatService.getMessages(currentUser['uid'], receiverId),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return const Center(
-            child: Text("Something went wrong! Please try gain later."),
+            child: Text("Something went wrong! Please try again later."),
           );
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -38,14 +35,14 @@ class MessageList extends StatelessWidget {
         return ListView.builder(
           padding: const EdgeInsets.only(
             bottom: 20,
-            // bottom: 40,
             left: 13,
             right: 13,
           ),
           reverse: true,
           itemCount: loadedMessages.length,
           itemBuilder: (ctx, index) {
-            final chatMessage = loadedMessages[index].data() as Map<String, dynamic>;
+            final chatMessage =
+            loadedMessages[index].data() as Map<String, dynamic>;
             final nextChatMessage = index + 1 < loadedMessages.length
                 ? loadedMessages[index + 1].data() as Map<String, dynamic>
                 : null;
@@ -58,13 +55,15 @@ class MessageList extends StatelessWidget {
             if (nextUserIsSame) {
               return MessageBubble.next(
                 message: chatMessage['message'],
-                isMe: FirebaseAuth.instance.currentUser!.uid == currentMessageUserId,
+                isMe: currentUser['uid'] == currentMessageUserId,
               );
             } else {
               return MessageBubble.first(
-                name: currentMessageUserId == FirebaseAuth.instance.currentUser!.uid ? "You" : chatMessage['sender_name'],
+                name: currentMessageUserId == currentUser['uid']
+                    ? "You"
+                    : chatMessage['sender_name'],
                 message: chatMessage['message'],
-                isMe: FirebaseAuth.instance.currentUser!.uid == currentMessageUserId,
+                isMe: currentUser['uid'] == currentMessageUserId,
               );
             }
           },

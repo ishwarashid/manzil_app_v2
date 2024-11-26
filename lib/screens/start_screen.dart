@@ -19,13 +19,6 @@ class StartScreen extends StatelessWidget {
             ),
           ),
 
-          // FadeInImage(
-          //   placeholder: MemoryImage(kTransparentImage),
-          //   image: NetworkImage(meal.imageUrl),
-          //   height: 200,
-          //   width: double.infinity,
-          //   fit: BoxFit.cover,
-          // ),
           Container(
             // margin: const EdgeInsets.all(100),
             width: 280,

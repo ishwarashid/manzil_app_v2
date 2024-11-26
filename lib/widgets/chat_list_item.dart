@@ -1,36 +1,38 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/screens/user_chat_screen.dart';
 
-class ChatListItem extends StatefulWidget {
+class ChatListItem extends ConsumerStatefulWidget {
   const ChatListItem({super.key, required this.userData});
 
   final Map<String, dynamic> userData;
 
   @override
-  State<ChatListItem> createState() => _ChatListItemState();
+  ConsumerState<ChatListItem> createState() => _ChatListItemState();
 }
 
-class _ChatListItemState extends State<ChatListItem> {
-
-  final _currentUser = FirebaseAuth.instance.currentUser;
-
-
+class _ChatListItemState extends ConsumerState<ChatListItem> {
   @override
   Widget build(BuildContext context) {
+    // Watch the current user from Riverpod
+    final currentUser = ref.watch(currentUserProvider);
 
-    if (widget.userData["id"] != _currentUser!.uid) {
-
+    // Check if the user in the list is not the current user
+    if (widget.userData["id"] != currentUser['uid']) {
+      // Combine first and last name of the user
       final fullName = widget.userData["first_name"] + " " + widget.userData["last_name"];
 
       return GestureDetector(
         onTap: () {
+          // Navigate to the chat screen with the selected user
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => UserChatScreen(
-                fullName: fullName,
-                receiverId: widget.userData["id"],
+                currentUser: currentUser,  // Pass current user data
+                fullName: fullName,         // Pass the full name of the selected user
+                receiverId: widget.userData["id"], // Pass receiverId (user's ID)
               ),
             ),
           );
@@ -45,6 +47,7 @@ class _ChatListItemState extends State<ChatListItem> {
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
+                // User's profile avatar (default for now)
                 CircleAvatar(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   child: const Icon(
@@ -52,9 +55,8 @@ class _ChatListItemState extends State<ChatListItem> {
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(
-                  width: 14,
-                ),
+                const SizedBox(width: 14),
+                // User's full name displayed in the list item
                 Text(
                   fullName,
                   style: const TextStyle(
@@ -69,6 +71,7 @@ class _ChatListItemState extends State<ChatListItem> {
         ),
       );
     } else {
+      // Return an empty container if the user is the current user
       return Container();
     }
   }
