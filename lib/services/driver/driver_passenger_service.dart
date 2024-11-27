@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:manzil_app_v2/services/chat/chat_services.dart';
+import 'package:manzil_app_v2/services/ride/ride_services.dart';
 
 class DriverPassengerService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ChatService _chatService = ChatService();
+  final RidesService _ridesService = RidesService();
 
   // Stream to get current ride for a passenger
   Stream<Map<String, dynamic>?> getCurrentRide(String passengerId) {
@@ -52,13 +54,30 @@ class DriverPassengerService {
     required Map<String, dynamic> driverInfo,
   }) async {
     try {
+      // First check if ride exists and is private
+      final rideDoc = await _firestore.collection('rides').doc(rideId).get();
+      if (!rideDoc.exists) {
+        throw Exception('Ride not found');
+      }
+
+      final rideData = rideDoc.data() as Map<String, dynamic>;
+      final isPrivate = rideData['isPrivate'] as bool;
+
+      // Check driver's active rides using RideService's method
+      if (isPrivate) {
+        final hasActive = await _ridesService.hasActiveRides(driverInfo['driverId']);
+        if (hasActive) {
+          throw Exception(
+              'Cannot accept this driver as they already have an active ride'
+          );
+        }
+      }
+
       // Start a batch write
       final batch = _firestore.batch();
 
-      // Reference to the ride document
+      // Update the main ride document
       final rideRef = _firestore.collection('rides').doc(rideId);
-
-      // Update the main ride document with selected driver's info
       batch.update(rideRef, {
         'status': 'accepted',
         'selectedDriverId': driverInfo['driverId'],
@@ -68,7 +87,7 @@ class DriverPassengerService {
         'acceptedAt': Timestamp.now(),
       });
 
-      // Create a trips collection entry to track ongoing/completed trips
+      // Create trip document
       final tripRef = _firestore.collection('trips').doc();
       batch.set(tripRef, {
         'rideId': rideId,
@@ -85,21 +104,18 @@ class DriverPassengerService {
         'actualFare': null,
       });
 
-      // Execute the batch
+      // Execute batch
       await batch.commit();
 
-      // Create a chat room between passenger and selected driver
-      await _chatService.createChatRoom(
-        currentUser,
-        driverInfo['driverId'],
-      );
+      // Create chat room
+      await _chatService.createChatRoom(currentUser, driverInfo['driverId']);
 
-      // Cancel other drivers after successful acceptance
+      // Cancel other drivers
       await _cancelOtherDrivers(rideId, driverInfo['driverId']);
 
     } catch (e) {
       print('Error accepting driver: $e');
-      throw Exception('Failed to accept driver');
+      throw Exception(e.toString());
     }
   }
 

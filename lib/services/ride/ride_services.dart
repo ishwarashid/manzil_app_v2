@@ -46,7 +46,7 @@ class RidesService {
   }
 
   // Check if driver has active rides
-  Future<bool> _hasActiveRides(String driverId) async {
+  Future<bool> hasActiveRides(String driverId) async {
     try {
       // Check for any rides where driver is selected and ride is not completed/cancelled
       final selectedRidesQuery = await _firestore
