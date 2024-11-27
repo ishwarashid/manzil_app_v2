@@ -7,6 +7,7 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
     "destination": '',
     "seats": 0,
     "fare": 0,
+    "private": false
   });
 
   void setPickup(String pickup) {
@@ -37,6 +38,13 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
     };
   }
 
+  void setPrivate(bool private) {
+    state = {
+      ...state,
+      "private": private,
+    };
+  }
+
   bool areAllFieldsFilled() {
     return state["pickup"] != '' &&
         state["destination"] != '' &&
@@ -50,6 +58,7 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
       "destination": '',
       "seats": 0,
       "fare": 0,
+      "private": false
     };
   }
 }

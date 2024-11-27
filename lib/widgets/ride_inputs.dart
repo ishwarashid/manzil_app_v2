@@ -1,5 +1,10 @@
+import 'dart:ffi';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/widgets/input_destination.dart';
 import 'package:manzil_app_v2/widgets/input_fare.dart';
 import 'package:manzil_app_v2/widgets/input_pickup.dart';
@@ -16,6 +21,8 @@ class RideInputs extends ConsumerStatefulWidget {
 }
 
 class _RideInputsState extends ConsumerState<RideInputs> {
+  bool _isProcessing = false;
+
   void _openSeatsModalOverlay() {
     showModalBottomSheet(
       isScrollControlled: true,
@@ -52,10 +59,77 @@ class _RideInputsState extends ConsumerState<RideInputs> {
     );
   }
 
-  void _bookRide() {
-    // save to database
-    ref.read(bookingInputsProvider.notifier).resetBookingInputs();
-    widget.onFindDrivers();
+  Future<void> _bookRide() async {
+    final bookingInputs = ref.read(bookingInputsProvider);
+    final currentUser = ref.read(currentUserProvider);
+
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      // Start a batch write
+      final batch = FirebaseFirestore.instance.batch();
+
+      // First, cancel all existing pending rides for this user
+      final existingRidesQuery = await FirebaseFirestore.instance
+          .collection('rides')
+          .where('passengerID', isEqualTo: currentUser['uid'])
+          .where('status', whereIn: ['pending', 'accepted'])
+          .get();
+
+      for (var doc in existingRidesQuery.docs) {
+        batch.update(doc.reference, {
+          'status': 'cancelled',
+          'cancelledAt': Timestamp.now(),
+          'cancelReason': 'New ride requested',
+        });
+      }
+
+      // Create the new ride
+      final newRideRef = FirebaseFirestore.instance.collection('rides').doc();
+      batch.set(newRideRef, {
+        'passengerName': '${currentUser['first_name']} ${currentUser['last_name']}',
+        'passengerID': currentUser['uid'],
+        'pickupLocation': bookingInputs['pickup'],
+        'destination': bookingInputs['destination'],
+        'seats': bookingInputs['seats'],
+        'offeredFare': bookingInputs['fare'],
+        'isPrivate': bookingInputs['private'],
+        'status': 'pending', // possible values: pending, accepted, completed, cancelled
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Execute all the batched writes
+      await batch.commit();
+
+      // Reset booking inputs and UI state
+      ref.read(bookingInputsProvider.notifier).resetBookingInputs();
+      setState(() {
+        _isProcessing = false;
+      });
+
+      widget.onFindDrivers();
+
+      print('Ride added successfully');
+    } catch (e) {
+      setState(() {
+        _isProcessing = false;
+      });
+
+      print('Failed to add ride: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Something went wrong. Please try again later.",
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -70,6 +144,8 @@ class _RideInputsState extends ConsumerState<RideInputs> {
     final destination = bookingInputs['destination'] as String? ?? "To";
     final seats = bookingInputs['seats'] as int? ?? 0;
     final fare = bookingInputs['fare'] as int? ?? 0;
+    final isPrivate = bookingInputs['private'] as bool ?? false;
+    print(isPrivate);
 
     return Padding(
       padding: const EdgeInsets.only(top: 30, bottom: 60, right: 30, left: 30),
@@ -81,7 +157,6 @@ class _RideInputsState extends ConsumerState<RideInputs> {
                 InkWell(
                   // onTap: _openPickupModalOverlay,
                   onTap: () {
-                    print("InkWell tapped");
                     _openPickupModalOverlay();
                   },
                   child: Row(
@@ -110,7 +185,7 @@ class _RideInputsState extends ConsumerState<RideInputs> {
                   ),
                 ),
                 const SizedBox(
-                  height: 40,
+                  height: 25,
                 ),
                 SizedBox(
                   height: 48,
@@ -230,6 +305,25 @@ class _RideInputsState extends ConsumerState<RideInputs> {
                     ),
                   ),
                 ),
+                const SizedBox(
+                  height: 15,
+                ),
+                SwitchListTile(
+                  value: isPrivate,
+                  onChanged: (isChecked) {
+                    ref
+                        .read(bookingInputsProvider.notifier)
+                        .setPrivate(isChecked);
+                  },
+                  title: const Text('Private Ride',
+                      style: TextStyle(
+                        fontSize: 18,
+                      )),
+                  subtitle: const Text('You can have driver all to yourself.',
+                      style: TextStyle(fontSize: 12)),
+                  activeColor: Theme.of(context).colorScheme.primary,
+                  contentPadding: const EdgeInsets.all(0),
+                ),
               ],
             ),
           ),
@@ -237,14 +331,23 @@ class _RideInputsState extends ConsumerState<RideInputs> {
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: areAllFieldsFilled ? _bookRide : null,
+              onPressed:
+                  (!_isProcessing && areAllFieldsFilled) ? _bookRide : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color.fromARGB(255, 255, 107, 74),
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 textStyle:
-                const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
               ),
-              child: const Text("Find a driver"),
+              child: _isProcessing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text("Find a driver"),
             ),
           )
         ],

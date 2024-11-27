@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:manzil_app_v2/main.dart';
+import 'package:manzil_app_v2/providers/booking_inputs_provider.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
+import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
 
 
 class MainDrawer extends ConsumerWidget {
@@ -131,6 +133,8 @@ class MainDrawer extends ConsumerWidget {
               onTap: () {
                 box.erase();
                 ref.read(currentUserProvider.notifier).clearUser();
+                ref.read(ridesFilterProvider.notifier).clearDestination();
+                ref.read(bookingInputsProvider.notifier).resetBookingInputs();
                 Navigator.of(context).pop();
                 Navigator.pushReplacement(
                   context,

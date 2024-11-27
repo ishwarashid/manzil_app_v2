@@ -6,9 +6,13 @@ class RidesFilterNotifier extends StateNotifier<String> {
   void setDestination(String destination) {
     state = destination;
   }
+
+  void clearDestination() {
+    state = '';
+  }
 }
 
 final ridesFilterProvider =
-StateNotifierProvider<RidesFilterNotifier, String>((ref) {
+    StateNotifierProvider<RidesFilterNotifier, String>((ref) {
   return RidesFilterNotifier();
 });

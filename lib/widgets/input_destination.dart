@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:manzil_app_v2/screens/booking.dart';
 
 import '../providers/booking_inputs_provider.dart';
 
@@ -46,7 +47,9 @@ class _InputDestinationState extends ConsumerState<InputDestination> {
               color: Color.fromARGB(200, 255, 255, 255),
             ),
           ),
-          const SizedBox(height: 60,),
+          const SizedBox(
+            height: 60,
+          ),
           Expanded(
             child: Form(
               key: _formKey,
@@ -55,7 +58,9 @@ class _InputDestinationState extends ConsumerState<InputDestination> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   TextFormField(
-                    initialValue: _enteredDestination.isNotEmpty ? _enteredDestination : null,
+                    initialValue: _enteredDestination.isNotEmpty
+                        ? _enteredDestination
+                        : null,
                     cursorColor: const Color.fromARGB(255, 255, 170, 42),
                     style: TextStyle(
                         fontSize: 18,
@@ -102,18 +107,42 @@ class _InputDestinationState extends ConsumerState<InputDestination> {
                       _enteredDestination = value!;
                     },
                   ),
-                  const SizedBox(height: 30,),
-                  ElevatedButton(
-                    onPressed: _saveDestination,
-                    style: ElevatedButton.styleFrom(
-                      elevation: 0.0,
-                      backgroundColor:
-                      const Color.fromARGB(100, 255, 170, 42),
-                      foregroundColor: const Color.fromARGB(255, 255, 170, 42),
-                      textStyle: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w500),
-                    ),
-                    child: const Text("Set"),
+                  const SizedBox(
+                    height: 30,
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => const Booking(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.map_outlined,
+                          color: Color.fromARGB(255, 255, 170, 42),
+                          size: 30,
+                        ),
+                      ),
+                      const Spacer(),
+                      ElevatedButton(
+                        onPressed: _saveDestination,
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0.0,
+                          backgroundColor:
+                              const Color.fromARGB(100, 255, 170, 42),
+                          foregroundColor:
+                              const Color.fromARGB(255, 255, 170, 42),
+                          textStyle: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w500),
+                        ),
+                        child: const Text("Set"),
+                      )
+                    ],
                   )
                 ],
               ),

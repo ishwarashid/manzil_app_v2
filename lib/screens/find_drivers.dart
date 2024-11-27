@@ -1,92 +1,159 @@
 import 'package:flutter/material.dart';
-import 'package:manzil_app_v2/screens/chats_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:manzil_app_v2/providers/current_user_provider.dart';
+import 'package:manzil_app_v2/services/chat/chat_services.dart';
+import 'package:manzil_app_v2/services/driver/driver_passenger_service.dart';
 import 'package:manzil_app_v2/widgets/driver_card.dart';
-import 'package:manzil_app_v2/widgets/main_drawer.dart';
 
-class FindDrivers extends StatefulWidget {
+class FindDrivers extends ConsumerStatefulWidget {
   const FindDrivers({super.key});
 
   @override
-  State<FindDrivers> createState() => _FindDriversState();
+  ConsumerState<FindDrivers> createState() => _FindDriversState();
 }
 
-class _FindDriversState extends State<FindDrivers> {
-  final _availableDrivers = [
-    {"driverName": "John Doe", "distance": "2 mins"},
-    {"driverName": "Jane Smith", "distance": "3 mins"},
-    {"driverName": "Jane Smith", "distance": "3 mins"},
-  ];
+class _FindDriversState extends ConsumerState<FindDrivers> {
+  final _driverPassengerService = DriverPassengerService();
+  final _chatService = ChatService();
 
-  final _ridesBooked = [
-    // {"pickup": "abc", "destination": "def"}
-  ];
+  bool _isAccepting = false;
 
-  // void _setScreen(String identifier) async {
-  //   Navigator.of(context).pop();
-  //   if (identifier == 'home') {
-  //     Navigator.of(context).pop();
-  //   } else if (identifier == 'chats') {
-  //     Navigator.of(context).push(
-  //       MaterialPageRoute(
-  //         builder: (ctx) => const ChatsScreen(),
-  //       ),
-  //     );
-  //   } else if (identifier == 'foundDrivers') {
-  //     Navigator.of(context).push(
-  //       MaterialPageRoute(
-  //         builder: (ctx) => const FindDrivers(),
-  //       ),
-  //     );
-  //   }
-  // }
+  Future<void> _acceptDriver(String rideId, Map<String, dynamic> driverInfo) async {
+    if (_isAccepting) return;
+
+    try {
+      setState(() {
+        _isAccepting = true;
+      });
+
+      final currentUser = ref.read(currentUserProvider);
+
+      await _driverPassengerService.acceptDriver(
+        rideId: rideId,
+        currentUser: currentUser,
+        driverInfo: driverInfo,
+      );
+      await _chatService.createChatRoom(currentUser, driverInfo['driverId']);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Driver accepted successfully!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to accept driver: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAccepting = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final hasBookARide = _ridesBooked.isNotEmpty;
-
-    Widget content =
-    const Center(child: Text("You haven't booked a ride yet!"),);
-
-    if (hasBookARide && _availableDrivers.isEmpty) {
-      content = Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "No one accepted your request!",
-              style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                  color: const Color.fromRGBO(30, 60, 87, 1),
-                  fontWeight: FontWeight.w500
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10,),
-            Text(
-              "Please check status again after few mins",
-              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                color: const Color.fromRGBO(30, 60, 87, 1),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_availableDrivers.isNotEmpty) {
-      content = ListView.builder(
-        itemCount: _availableDrivers.length,
-        itemBuilder: (context, index) => DriverCard(_availableDrivers[index]),
-      );
-    }
+    final currentUser = ref.watch(currentUserProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Found Drivers"),
       ),
-      // drawer: MainDrawer(onSelectScreen: _setScreen,),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: content,
+        child: StreamBuilder<Map<String, dynamic>?>(
+          stream: _driverPassengerService.getCurrentRide(currentUser['uid']),
+          builder: (context, rideSnapshot) {
+            if (rideSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (rideSnapshot.hasError) {
+              return Center(child: Text('Error: ${rideSnapshot.error}'));
+            }
+
+            final currentRide = rideSnapshot.data;
+
+            if (currentRide == null) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "No active ride request found",
+                      style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                          color: const Color.fromRGBO(30, 60, 87, 1),
+                          fontWeight: FontWeight.w500),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      "Please create a ride request first",
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        color: const Color.fromRGBO(30, 60, 87, 1),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _driverPassengerService.getAcceptedDrivers(currentRide['id']),
+              builder: (context, driversSnapshot) {
+                if (driversSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (driversSnapshot.hasError) {
+                  return Center(child: Text('Error: ${driversSnapshot.error}'));
+                }
+
+                final drivers = driversSnapshot.data ?? [];
+
+                if (drivers.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "No drivers have accepted yet!",
+                          style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                              color: const Color.fromRGBO(30, 60, 87, 1),
+                              fontWeight: FontWeight.w500),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          "Please check again in a few minutes",
+                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                            color: const Color.fromRGBO(30, 60, 87, 1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: drivers.length,
+                  itemBuilder: (context, index) => DriverCard(
+                    driverInfo: drivers[index],
+                    onAccept: () => _acceptDriver(currentRide['id'], drivers[index]),
+                    isAccepting: _isAccepting,
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

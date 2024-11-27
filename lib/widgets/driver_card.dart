@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:manzil_app_v2/providers/current_user_provider.dart';
+import 'package:manzil_app_v2/screens/chats_screen.dart';
+import 'package:manzil_app_v2/screens/user_chat_screen.dart';
 
-class DriverCard extends StatelessWidget {
-  const DriverCard(this.driver, {super.key});
+class DriverCard extends ConsumerWidget {
+  final Map<String, dynamic> driverInfo;
+  final VoidCallback onAccept;
+  final bool isAccepting;
 
-  final Map<String, Object> driver;
+  const DriverCard({
+    required this.driverInfo,
+    required this.onAccept,
+    this.isAccepting = false,
+    super.key,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.read(currentUserProvider);
+
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
       margin: const EdgeInsets.symmetric(vertical: 10),
@@ -22,7 +35,7 @@ class DriverCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      (driver["driverName"] as String),
+                      driverInfo["driverName"] as String,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -30,20 +43,49 @@ class DriverCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      "${driver["distance"]} away",
+                      "${driverInfo["distance"].toStringAsFixed(1)} km away",
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.secondary,
                       ),
                     ),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.message,
-                    color: Color.fromARGB(255, 255, 170, 42),
-                  ),
-                  onPressed: () {},
-                )
+                Row(
+                  children: [
+                    Text(
+                      "Rs. ${driverInfo["calculatedFare"]}",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color.fromARGB(255, 45, 45, 45),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.message,
+                        color: Color.fromARGB(255, 255, 170, 42),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ChatsScreen(),
+                          ),
+                        );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserChatScreen(
+                              currentUser: currentUser,
+                              fullName: driverInfo["driverName"] as String,
+                              receiverId: driverInfo["driverId"],
+                            ),
+                          ),
+                        );
+                      }, // Chat functionality handled in parent
+                    ),
+                  ],
+                ),
               ],
             ),
             const SizedBox(
@@ -53,14 +95,26 @@ class DriverCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: isAccepting ? null : onAccept,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    textStyle:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  child: const Text("Book"),
+                  child: isAccepting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text("Book"),
                 ),
               ],
             )

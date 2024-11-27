@@ -46,6 +46,7 @@ dependencies:
   http: ^1.2.2
   flutter_riverpod: ^2.6.1
   sliding_up_panel: ^2.0.0+1
+  intl: ^0.20.0
 
 dev_dependencies:
   flutter_test:
@@ -78,6 +79,7 @@ flutter:
     - assets/images/dark_logo.png
     - assets/images/start_screen_illustration.png
     - assets/images/phone_screen_illustration.png
+    - assets/images/no_activity_illustration.png
     - assets/icons/book_a_ride_icon.png
     - assets/icons/filter_rides_icon.png
   # An image asset can refer to one or more resolution-specific "variants", see

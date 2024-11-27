@@ -10,7 +10,6 @@ class SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final box = GetStorage();
     String? phoneNumber = box.read('phoneNumber');
-\
     if (phoneNumber == null || phoneNumber.isEmpty) {
       Future.microtask(() {
         Navigator.pushReplacement(
