@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
 import 'package:manzil_app_v2/screens/find_drivers.dart';
 import 'package:manzil_app_v2/widgets/main_drawer.dart';
+import 'package:manzil_app_v2/widgets/main_map.dart';
 import 'package:manzil_app_v2/widgets/ride_inputs.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
@@ -71,7 +72,7 @@ class _BookingState extends State<Booking> {
           ),
           body: Stack(
             children: [
-              const Text("Map here"),
+              const MainMap(),
               Positioned(
                 top: 16,
                 left: 16,

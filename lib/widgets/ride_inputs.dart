@@ -1,7 +1,4 @@
-import 'dart:ffi';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
@@ -13,7 +10,6 @@ import '../widgets/input_seats.dart';
 
 class RideInputs extends ConsumerStatefulWidget {
   const RideInputs({super.key, required this.onFindDrivers});
-
   final Function() onFindDrivers;
 
   @override
@@ -22,6 +18,55 @@ class RideInputs extends ConsumerStatefulWidget {
 
 class _RideInputsState extends ConsumerState<RideInputs> {
   bool _isProcessing = false;
+
+  @override
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      if (!mounted) return;
+      final currentUser = ref.read(currentUserProvider);
+      final bookingInputs = ref.read(bookingInputsProvider);
+
+      // Only set if pickup is empty (not manually set)
+      if ((bookingInputs['pickup'] as String? ?? '').isEmpty) {
+        final locationText = currentUser['location_text'] as String?;
+        final coordinates = currentUser['coordinates'] as List?;
+
+        if (locationText != null && locationText.isNotEmpty &&
+            coordinates != null && coordinates.isNotEmpty) {
+          final List<double> typedCoordinates = coordinates.map((e) =>
+              (e as num).toDouble()).toList();
+
+          // Store both location text and coordinates
+          ref.read(bookingInputsProvider.notifier)
+            ..setPickup(locationText)
+            ..setPickupCoordinates(typedCoordinates);
+        }
+      }
+    });
+  }
+
+  // void _setInitialPickupLocation() {
+  //   final currentUser = ref.read(currentUserProvider);
+  //   final bookingInputs = ref.read(bookingInputsProvider);
+  //
+  //   // Only set if pickup is empty (not manually set)
+  //   if ((bookingInputs['pickup'] as String? ?? '').isEmpty) {
+  //     final locationText = currentUser['location_text'] as String?;
+  //     final coordinates = currentUser['coordinates'] as List?;
+  //
+  //     if (locationText != null && locationText.isNotEmpty &&
+  //         coordinates != null && coordinates.isNotEmpty) {
+  //
+  //       final List<double> typedCoordinates = coordinates.map((e) => (e as num).toDouble()).toList();
+  //
+  //       ref.read(bookingInputsProvider.notifier)
+  //         ..setPickup(locationText)
+  //         ..setPickupCoordinates(typedCoordinates);
+  //     }
+  //   }
+  // }
 
   void _openSeatsModalOverlay() {
     showModalBottomSheet(
@@ -68,6 +113,11 @@ class _RideInputsState extends ConsumerState<RideInputs> {
     });
 
     try {
+      // Get pickup coordinates - either from booking inputs or current user
+      final pickupCoordinates = (bookingInputs['pickupCoordinates'] as List?)?.isNotEmpty == true
+          ? bookingInputs['pickupCoordinates']
+          : currentUser['coordinates'];
+
       // Start a batch write
       final batch = FirebaseFirestore.instance.batch();
 
@@ -92,40 +142,34 @@ class _RideInputsState extends ConsumerState<RideInputs> {
         'passengerName': '${currentUser['first_name']} ${currentUser['last_name']}',
         'passengerID': currentUser['uid'],
         'pickupLocation': bookingInputs['pickup'],
+        'pickupCoordinates': pickupCoordinates,
         'destination': bookingInputs['destination'],
         'seats': bookingInputs['seats'],
         'offeredFare': bookingInputs['fare'],
         'isPrivate': bookingInputs['private'],
-        'status': 'pending', // possible values: pending, accepted, completed, cancelled
+        'status': 'pending',
         'createdAt': Timestamp.now(),
         'updatedAt': Timestamp.now(),
       });
 
-      // Execute all the batched writes
       await batch.commit();
 
-      // Reset booking inputs and UI state
       ref.read(bookingInputsProvider.notifier).resetBookingInputs();
       setState(() {
         _isProcessing = false;
       });
 
       widget.onFindDrivers();
-
-      print('Ride added successfully');
     } catch (e) {
       setState(() {
         _isProcessing = false;
       });
 
-      print('Failed to add ride: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              "Something went wrong. Please try again later.",
-            ),
+            content: Text("Something went wrong. Please try again later."),
           ),
         );
       }
@@ -136,17 +180,21 @@ class _RideInputsState extends ConsumerState<RideInputs> {
   Widget build(BuildContext context) {
     final bookingInputs = ref.watch(bookingInputsProvider);
     final bookingInputsNotifier = ref.read(bookingInputsProvider.notifier);
+    final currentUser = ref.watch(currentUserProvider);
 
     bool areAllFieldsFilled = bookingInputsNotifier.areAllFieldsFilled();
 
-    final pickup =
-        bookingInputs['pickup'] as String? ?? "No Pickup Location Specified";
+    // Get pickup from booking inputs or fall back to current user location
+    String pickup = (bookingInputs['pickup'] as String? ?? '').isNotEmpty
+        ? bookingInputs['pickup'] as String
+        : currentUser['location_text'] as String? ?? "No Pickup Location Specified";
+
     final destination = bookingInputs['destination'] as String? ?? "To";
     final seats = bookingInputs['seats'] as int? ?? 0;
     final fare = bookingInputs['fare'] as int? ?? 0;
-    final isPrivate = bookingInputs['private'] as bool ?? false;
-    print(isPrivate);
+    final isPrivate = bookingInputs['private'] as bool? ?? false;
 
+    // Rest of your build method remains the same...
     return Padding(
       padding: const EdgeInsets.only(top: 30, bottom: 60, right: 30, left: 30),
       child: Column(
@@ -155,10 +203,7 @@ class _RideInputsState extends ConsumerState<RideInputs> {
             child: Column(
               children: [
                 InkWell(
-                  // onTap: _openPickupModalOverlay,
-                  onTap: () {
-                    _openPickupModalOverlay();
-                  },
+                  onTap: _openPickupModalOverlay,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -167,14 +212,10 @@ class _RideInputsState extends ConsumerState<RideInputs> {
                         color: Color.fromARGB(255, 255, 107, 74),
                         size: 30,
                       ),
-                      const SizedBox(
-                        width: 10,
-                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          pickup.isNotEmpty
-                              ? pickup
-                              : "No Pickup Location Specified",
+                          pickup,
                           style: const TextStyle(fontSize: 18),
                           softWrap: true,
                           maxLines: 1,

@@ -1,18 +1,35 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class RidesFilterNotifier extends StateNotifier<String> {
-  RidesFilterNotifier() : super('');
+class RidesFilterNotifier extends StateNotifier<Map<String, Object>> {
+  RidesFilterNotifier()
+      : super({
+    "destination": '',
+    "coordinates": <double>[], // Changed from List<int>
+  });
 
   void setDestination(String destination) {
-    state = destination;
+    state = {
+      ...state,
+      "destination": destination,
+    };
   }
 
-  void clearDestination() {
-    state = '';
+  void setDestinationCoordinates(List<double> coordinates) {
+    state = {
+      ...state,
+      "coordinates": coordinates,
+    };
+  }
+
+  void clearFilter() {
+    state = {
+      "destination": '',
+      "coordinates": [],
+    };
   }
 }
 
 final ridesFilterProvider =
-    StateNotifierProvider<RidesFilterNotifier, String>((ref) {
+StateNotifierProvider<RidesFilterNotifier, Map<String, Object>>((ref) {
   return RidesFilterNotifier();
 });

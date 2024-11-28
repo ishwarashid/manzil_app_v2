@@ -19,14 +19,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedPageIndex = 0;
-
   String? phoneNumber;
-
-  void _selectPage(int index) {
-    setState(() {
-      _selectedPageIndex = index;
-    });
-  }
+  bool _isLoadingLocation = false;
 
   @override
   void initState() {
@@ -34,6 +28,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final box = GetStorage();
     phoneNumber = box.read('phoneNumber');
     _fetchUserData();
+    _initializeLocation();
+  }
+
+  Future<void> _initializeLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      final userNotifier = ref.read(currentUserProvider.notifier);
+      final hasPermission = await userNotifier.requestLocationPermission();
+
+      if (hasPermission) {
+        await userNotifier.updateLocation();
+      } else {
+        // Handle permission denied
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission is required for this app'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error getting location: $e'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
+    }
   }
 
   Future<void> _fetchUserData() async {
@@ -80,12 +113,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  void _selectPage(int index) {
+    setState(() {
+      _selectedPageIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget activePage = const UserActivityScreen();
 
     final currentUser = ref.watch(currentUserProvider);
-    // print(currentUser);
+    print(currentUser);
 
     if (_selectedPageIndex == 1) {
       activePage = const RideRequestsScreen();
@@ -95,6 +134,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
+          if (_isLoadingLocation)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: ElevatedButton.icon(
@@ -109,14 +159,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                textStyle:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500
+                ),
               ),
               icon: const ImageIcon(
                 size: 24,
                 color: Color.fromARGB(255, 255, 170, 42),
-                ResizeImage(AssetImage('assets/icons/book_a_ride_icon.png'),
-                    width: 48, height: 48),
+                ResizeImage(
+                    AssetImage('assets/icons/book_a_ride_icon.png'),
+                    width: 48,
+                    height: 48
+                ),
               ),
               label: const Text("Book a Ride"),
             ),
@@ -130,9 +185,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         currentIndex: _selectedPageIndex,
         items: const [
           BottomNavigationBarItem(
-              icon: Icon(Icons.backup_table), label: "Activity"),
+              icon: Icon(Icons.backup_table),
+              label: "Activity"
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.drive_eta_outlined), label: "Accept Requests"),
+              icon: Icon(Icons.drive_eta_outlined),
+              label: "Accept Requests"
+          ),
         ],
       ),
     );

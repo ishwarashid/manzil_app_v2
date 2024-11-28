@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
   BookingInputsNotifier()
       : super({
-    "pickup": 'Tariq Bin Ziad Colony', // will come from map
+    "pickup": '',
+    "pickupCoordinates": <double>[], // Changed from List<int>
     "destination": '',
+    "destinationCoordinates": <double>[], // Changed from List<int>
     "seats": 0,
     "fare": 0,
     "private": false
@@ -17,10 +19,24 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
     };
   }
 
+  void setPickupCoordinates(List<double> coordinates) {
+    state = {
+      ...state,
+      "pickupCoordinates": coordinates,
+    };
+  }
+
   void setDestination(String destination) {
     state = {
       ...state,
       "destination": destination,
+    };
+  }
+
+  void setDestinationCoordinates(List<double> coordinates) {
+    state = {
+      ...state,
+      "destinationCoordinates": coordinates,
     };
   }
 
@@ -46,19 +62,30 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
   }
 
   bool areAllFieldsFilled() {
+    print(state["pickup"]);
+    print(state["destination"]);
+    print(state["seats"]);
+    print( state["fare"]);
+    print(state["pickupCoordinates"]);
+    print(state["destinationCoordinates"]);
+
     return state["pickup"] != '' &&
         state["destination"] != '' &&
         state["seats"] != 0 &&
-        state["fare"] != 0;
+        state["fare"] != 0 &&
+        (state["pickupCoordinates"] as List).isNotEmpty &&
+        (state["destinationCoordinates"] as List).isNotEmpty;
   }
 
   void resetBookingInputs() {
     state = {
-      "pickup": 'Tariq Bin Ziad Colony', // will come from map
+      "pickup": '',
+      "pickupCoordinates": [],
       "destination": '',
+      "destinationCoordinates": [],
       "seats": 0,
       "fare": 0,
-      "private": false
+      "private": false,
     };
   }
 }

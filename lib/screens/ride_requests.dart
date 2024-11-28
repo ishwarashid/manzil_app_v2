@@ -31,13 +31,14 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   @override
   void initState() {
     super.initState();
-    final enteredDestination = ref.read(ridesFilterProvider) ?? '';
+    final enteredDestination = ref.read(ridesFilterProvider)["destination"] as String ?? '';
     if (enteredDestination.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showDestinationInputDialog();
       });
     }
   }
+
 
   Future<void> _initiateChat(Map<String, dynamic> request) async {
     final currentUser = ref.read(currentUserProvider);
@@ -143,7 +144,7 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    final enteredDestination = ref.watch(ridesFilterProvider) ?? '';
+    final enteredDestination = ref.watch(ridesFilterProvider)["destination"] as String? ?? '';
 
     return Padding(
       padding: const EdgeInsets.all(16),

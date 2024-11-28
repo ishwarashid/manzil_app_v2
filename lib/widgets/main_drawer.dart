@@ -183,7 +183,7 @@ class MainDrawer extends ConsumerWidget {
               onTap: () {
                 box.erase();
                 ref.read(currentUserProvider.notifier).clearUser();
-                ref.read(ridesFilterProvider.notifier).clearDestination();
+                ref.read(ridesFilterProvider.notifier).clearFilter();
                 ref.read(bookingInputsProvider.notifier).resetBookingInputs();
                 Navigator.of(context).pop();
                 Navigator.pushReplacement(

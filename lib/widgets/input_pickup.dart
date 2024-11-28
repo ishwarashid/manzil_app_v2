@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:manzil_app_v2/screens/booking.dart';
-
+import 'package:manzil_app_v2/screens/map_screen.dart';
 import '../providers/booking_inputs_provider.dart';
 
 class InputPickup extends ConsumerStatefulWidget {
@@ -13,20 +12,32 @@ class InputPickup extends ConsumerStatefulWidget {
 
 class _InputPickupState extends ConsumerState<InputPickup> {
   final _formKey = GlobalKey<FormState>();
-
-  var _enteredPickup = '';
+  late TextEditingController _pickupController;
+  List<double>? _selectedCoordinates;
 
   @override
   void initState() {
     super.initState();
     final bookingInputs = ref.read(bookingInputsProvider);
-    _enteredPickup = bookingInputs["pickup"] as String? ?? '';
+    _pickupController = TextEditingController(
+        text: bookingInputs["pickup"] as String? ?? ''
+    );
+    _selectedCoordinates = (bookingInputs["pickupCoordinates"] as List?)?.cast<double>();
   }
 
-  void _saveDestination() {
+  @override
+  void dispose() {
+    _pickupController.dispose();
+    super.dispose();
+  }
+
+  void _savePickup() {
     if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      ref.read(bookingInputsProvider.notifier).setPickup(_enteredPickup);
+      final notifier = ref.read(bookingInputsProvider.notifier);
+      notifier.setPickup(_pickupController.text);
+      if (_selectedCoordinates != null) {
+        notifier.setPickupCoordinates(_selectedCoordinates!);
+      }
       Navigator.pop(context);
     }
   }
@@ -45,9 +56,7 @@ class _InputPickupState extends ConsumerState<InputPickup> {
               color: Color.fromARGB(200, 255, 255, 255),
             ),
           ),
-          const SizedBox(
-            height: 60,
-          ),
+          const SizedBox(height: 60),
           Expanded(
             child: Form(
               key: _formKey,
@@ -55,12 +64,12 @@ class _InputPickupState extends ConsumerState<InputPickup> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   TextFormField(
-                    initialValue:
-                        _enteredPickup.isNotEmpty ? _enteredPickup : null,
+                    controller: _pickupController,
                     cursorColor: const Color.fromARGB(255, 255, 170, 42),
                     style: TextStyle(
                         fontSize: 18,
-                        color: Theme.of(context).colorScheme.onPrimary),
+                        color: Theme.of(context).colorScheme.onPrimary
+                    ),
                     decoration: InputDecoration(
                       label: const Text(
                         'From',
@@ -71,22 +80,27 @@ class _InputPickupState extends ConsumerState<InputPickup> {
                       ),
                       focusedBorder: const OutlineInputBorder(
                         borderSide: BorderSide(
-                            color: Color.fromARGB(255, 255, 170, 42), width: 2),
+                            color: Color.fromARGB(255, 255, 170, 42),
+                            width: 2
+                        ),
                       ),
                       enabledBorder: const OutlineInputBorder(
                         borderSide: BorderSide(
                             color: Color.fromARGB(160, 255, 255, 255),
-                            width: 2),
+                            width: 2
+                        ),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderSide: BorderSide(
                             color: Theme.of(context).colorScheme.error,
-                            width: 2),
+                            width: 2
+                        ),
                       ),
                       focusedErrorBorder: OutlineInputBorder(
                         borderSide: BorderSide(
                             color: Theme.of(context).colorScheme.error,
-                            width: 2),
+                            width: 2
+                        ),
                       ),
                       contentPadding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
                     ),
@@ -99,24 +113,27 @@ class _InputPickupState extends ConsumerState<InputPickup> {
                       }
                       return null;
                     },
-                    onSaved: (value) {
-                      _enteredPickup = value!;
-                    },
                   ),
-                  const SizedBox(
-                    height: 30,
-                  ),
+                  const SizedBox(height: 30),
                   Row(
                     children: [
                       IconButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.pushReplacement(
+                        onPressed: () async {
+                          print("here");
+                          final result = await Navigator.push<Map<String, dynamic>>(
                             context,
                             MaterialPageRoute(
-                              builder: (ctx) => const Booking(),
+                              builder: (ctx) => const MapScreen('pickup'),
                             ),
                           );
+                          print("pickup from map: $result");
+
+                          if (result != null && mounted) {
+                            setState(() {
+                              _pickupController.text = result['address'];
+                              _selectedCoordinates = result['coordinates'] as List<double>;
+                            });
+                          }
                         },
                         icon: const Icon(
                           Icons.map_outlined,
@@ -126,15 +143,15 @@ class _InputPickupState extends ConsumerState<InputPickup> {
                       ),
                       const Spacer(),
                       ElevatedButton(
-                        onPressed: _saveDestination,
+                        onPressed: _savePickup,
                         style: ElevatedButton.styleFrom(
                           elevation: 0.0,
-                          backgroundColor:
-                              const Color.fromARGB(100, 255, 170, 42),
-                          foregroundColor:
-                              const Color.fromARGB(255, 255, 170, 42),
+                          backgroundColor: const Color.fromARGB(100, 255, 170, 42),
+                          foregroundColor: const Color.fromARGB(255, 255, 170, 42),
                           textStyle: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w500),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500
+                          ),
                         ),
                         child: const Text("Set"),
                       )
