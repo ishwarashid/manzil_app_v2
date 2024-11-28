@@ -47,6 +47,7 @@ dependencies:
   flutter_riverpod: ^2.6.1
   sliding_up_panel: ^2.0.0+1
   intl: ^0.20.0
+  flutter_rating_bar: ^4.0.1
 
 dev_dependencies:
   flutter_test:
@@ -82,6 +83,7 @@ flutter:
     - assets/images/no_activity_illustration.png
     - assets/icons/book_a_ride_icon.png
     - assets/icons/filter_rides_icon.png
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
 

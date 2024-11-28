@@ -5,7 +5,8 @@ import 'package:manzil_app_v2/main.dart';
 import 'package:manzil_app_v2/providers/booking_inputs_provider.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
-
+import 'package:manzil_app_v2/providers/user_ride_providers.dart';
+import 'package:manzil_app_v2/screens/tracking.dart';
 
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key, required this.onSelectScreen});
@@ -15,8 +16,9 @@ class MainDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final box = GetStorage();
-
     final currentUser = ref.watch(currentUserProvider);
+    final userRideStatus =
+        ref.watch(userRideStatusProvider(currentUser['uid']));
 
     return Drawer(
       child: Column(
@@ -37,9 +39,7 @@ class MainDrawer extends ConsumerWidget {
                         color: Theme.of(context).colorScheme.onPrimary,
                         size: 42,
                       ),
-                      const SizedBox(
-                        width: 16,
-                      ),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Text(
                           (currentUser['first_name'] as String).isEmpty
@@ -96,24 +96,74 @@ class MainDrawer extends ConsumerWidget {
                   },
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
-                child: ListTile(
-                  title: Text(
-                    "Found Drivers",
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 20),
-                  ),
-                  leading: Icon(
-                    Icons.home_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 30,
-                  ),
-                  onTap: () {
-                    onSelectScreen('foundDrivers');
-                  },
-                ),
+              userRideStatus.when(
+                data: (status) {
+                  // Show Found Drivers only if user is a passenger and has pending ride
+                  if (!status.isDriver &&
+                      status.activeRides
+                          .any((ride) => ride['status'] == 'pending')) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
+                      child: ListTile(
+                        title: Text(
+                          "Found Drivers",
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 20),
+                        ),
+                        leading: Icon(
+                          Icons.directions_car_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 30,
+                        ),
+                        onTap: () {
+                          onSelectScreen('foundDrivers');
+                        },
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+              userRideStatus.when(
+                data: (status) {
+                  final hasAcceptedRide = status.activeRides
+                      .any((ride) => (ride['status'] == 'accepted' || ride['status'] == 'picked' || ride['status'] == 'paying'));
+                  // Show Tracking if user has any accepted ride
+                  // For driver, make sure they only have one accepted ride
+                  if (hasAcceptedRide) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
+                      child: ListTile(
+                        title: Text(
+                          "Tracking",
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 20),
+                        ),
+                        leading: Icon(
+                          Icons.location_on_outlined,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 30,
+                        ),
+                        onTap: () {
+                          // onSelectScreen('tracking');
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => TrackingScreen(status.isDriver),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
               ),
             ],
           ),

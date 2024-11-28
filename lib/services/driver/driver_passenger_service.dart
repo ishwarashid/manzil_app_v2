@@ -63,14 +63,20 @@ class DriverPassengerService {
       final rideData = rideDoc.data() as Map<String, dynamic>;
       final isPrivate = rideData['isPrivate'] as bool;
 
-      // Check driver's active rides using RideService's method
       if (isPrivate) {
         final hasActive = await _ridesService.hasActiveRides(driverInfo['driverId']);
-        if (hasActive) {
+        if(hasActive) {
           throw Exception(
-              'Cannot accept this driver as they already have an active ride'
+              'Cannot accept this driver as they already have an active ride.'
           );
         }
+      }
+
+      final hasPrivateRides = await _ridesService.hasPrivateRide(driverInfo['driverId']);
+      if (hasPrivateRides) {
+        throw Exception(
+            'You cannot accept this driver as they already have an private ride.'
+        );
       }
 
       // Start a batch write

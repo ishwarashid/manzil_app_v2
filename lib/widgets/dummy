@@ -1,0 +1,56 @@
+  Future<void> _showPaymentDialog(BuildContext context, String rideId) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('Select Payment Method'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.circle, color: Colors.amber,),
+              title: const Text('Cash'),
+              onTap: _isPaying ? null :  () async {
+                print("inside");
+                // Navigator.of(ctx).pop();
+                setState(() {
+                  _isPaying = true;
+                });
+
+                await _updateRideStatus(rideId, 'paying');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.circle, color: Colors.redAccent,),
+              title: const Text('JazzCash'),
+              onTap: _isPaying ? null : () async {
+                // Navigator.of(ctx).pop();
+                setState(() {
+                  _isPaying = true;
+                });
+                await _updateRideStatus(rideId, 'paying');
+                // Add JazzCash integration here
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.circle, color: Colors.green,),
+              title: const Text('EasyPaisa'),
+              onTap: _isPaying ? null : () async {
+                setState(() {
+                  _isPaying = true;
+                });
+                await _updateRideStatus(rideId, 'paying');
+                // Add EasyPaisa integration here
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isPaying? null :() => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }

@@ -60,28 +60,32 @@ class RidesService {
         return true;
       }
 
-      // Check for any private rides the driver has accepted
-      final acceptedPrivateRidesQuery = await _firestore
-          .collection('rides')
-          .where('isPrivate', isEqualTo: true)
-          .where('status', isEqualTo: 'pending')
-          .get();
-
-      for (var doc in acceptedPrivateRidesQuery.docs) {
-        final acceptedByDoc = await doc.reference
-            .collection('acceptedBy')
-            .doc(driverId)
-            .get();
-
-        if (acceptedByDoc.exists) {
-          return true;
-        }
-      }
-
       return false;
     } catch (e) {
       print('Error checking active rides: $e');
       throw Exception('Failed to check active rides');
+    }
+  }
+
+
+  Future<bool> hasPrivateRide(String driverId) async {
+    try {
+      // Get all rides where this user is the selected driver
+      final driverRidesQuery = await _firestore
+          .collection('rides')
+          .where('selectedDriverId', isEqualTo: driverId)
+          .where('status', isEqualTo: 'accepted')
+          .get();
+
+      // Check if any of these rides are private
+      return driverRidesQuery.docs.any((doc) {
+        final data = doc.data();
+        return data['isPrivate'] == true;
+      });
+
+    } catch (e) {
+      print('Error checking private rides: $e');
+      throw Exception('Failed to check private rides');
     }
   }
 
@@ -97,13 +101,20 @@ class RidesService {
       final rideData = rideDoc.data() as Map<String, dynamic>;
       final isPrivate = rideData['isPrivate'] as bool;
 
-      // Check if driver has any active rides
-      final hasActive = await _hasActiveRides(driverInfo['uid']);
+      if (isPrivate) {
+        final hasActive = await hasActiveRides(driverInfo['uid']);
+        if (hasActive) {
+          throw Exception(
+              'You cannot accept this ride as you already have an active ride. And the ride you are going to accept is private.'
+          );
+        }
+      }
 
-      // If ride is private or driver has an active private ride, don't allow accepting
-      if (hasActive) {
+
+      final hasPrivateRides = await hasPrivateRide(driverInfo['uid']);
+      if (hasPrivateRides) {
         throw Exception(
-            'You cannot accept this ride as you already have an active ride'
+            'You cannot accept this ride as you already have an private ride.'
         );
       }
 
@@ -197,4 +208,55 @@ class RidesService {
       'cancelledAt': Timestamp.now(),
     });
   }
+
+  Future<void> addRatingAndUpdateDriver({
+    required String rideId,
+    required String driverId,
+    required double rating
+  }) async {
+    try {
+      // Start a batch write
+      final batch = _firestore.batch();
+
+      // Add rating to ride document
+      final rideRef = _firestore.collection('rides').doc(rideId);
+      batch.update(rideRef, {
+          'rating': rating,
+      });
+
+      // Get all completed rides for this driver with reviews
+      final driverRidesQuery = await _firestore
+          .collection('rides')
+          .where('selectedDriverId', isEqualTo: driverId)
+          .where('status', isEqualTo: 'completed')
+          .get();
+
+      // Calculate new average rating
+      double totalRating = rating;
+      int ratingCount = 1;
+
+      for (var doc in driverRidesQuery.docs) {
+        final data = doc.data();
+        if (data['rating'] != null ) {
+          totalRating += data['rating'];
+          ratingCount++;
+        }
+      }
+
+      final averageRating = totalRating / ratingCount;
+
+      // Update driver's overall rating
+      final driverRef = _firestore.collection('users').doc(driverId);
+      batch.update(driverRef, {
+        'overallRating': averageRating,
+        // 'totalRatings': ratingCount,
+      });
+
+      await batch.commit();
+    } catch (e) {
+      print('Error adding rating: $e');
+      throw Exception('Failed to add rating');
+    }
+  }
+
 }
