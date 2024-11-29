@@ -5,6 +5,7 @@ import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/providers/user_ride_providers.dart';
 import 'package:manzil_app_v2/screens/home_screen.dart';
 import 'package:manzil_app_v2/services/ride/ride_services.dart';
+import 'package:manzil_app_v2/widgets/passenger_tracking_map.dart';
 import 'package:manzil_app_v2/widgets/ride_rating_dialog.dart';
 
 class PassengerTracking extends ConsumerStatefulWidget {
@@ -217,13 +218,20 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
               Future.microtask(() {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const HomeScreen()),
-                  (route) => false,
+                      (route) => false,
                 );
               });
               return const Center(child: CircularProgressIndicator());
             }
+
+            // Handle completed ride if exists
+            final currentRide = completedRides.first;
+            Future.microtask(() => _handleRideCompletion(currentRide));
+            return const Center(child: CircularProgressIndicator());
           }
 
+          // Only get here if there are pending rides
+          if (!mounted) return const SizedBox();
           final currentRide = pendingRides.first;
 
           if (currentRide.isEmpty) {
@@ -242,8 +250,10 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
           return Stack(
             children: [
               // Background content or other widgets
-              const Positioned.fill(
-                child: SizedBox(), // Replace with your map widget
+              Positioned.fill(
+                child: PassengerTrackingMap(
+                  ride: currentRide,
+                ),
               ),
 
               // Emergency Button (show only when ride is picked)

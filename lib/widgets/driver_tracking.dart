@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/screens/home_screen.dart';
+import 'package:manzil_app_v2/widgets/driver_tracking_map.dart';
 
 class DriverTracking extends ConsumerStatefulWidget {
-
   const DriverTracking({
     super.key,
   });
@@ -18,7 +18,6 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
   bool _isProcessing = false;
   String? _processingRideId;
 
-
   Stream<List<Map<String, dynamic>>> getRidesStream(String driverId) {
     return FirebaseFirestore.instance
         .collection('rides')
@@ -26,11 +25,11 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
         .where('status', whereIn: ['accepted', 'picked', 'paying'])
         .snapshots()
         .map((snapshot) => snapshot.docs
-        .map((doc) => {
-      'id': doc.id,
-      ...doc.data(),
-    })
-        .toList());
+            .map((doc) => {
+                  'id': doc.id,
+                  ...doc.data(),
+                })
+            .toList());
   }
 
   Future<void> _sendEmergencyAlert(String rideId, String driverId) async {
@@ -48,10 +47,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
         _processingRideId = rideId;
       });
 
-      await FirebaseFirestore.instance
-          .collection('rides')
-          .doc(rideId)
-          .update({
+      await FirebaseFirestore.instance.collection('rides').doc(rideId).update({
         'status': newStatus,
         'updatedAt': Timestamp.now(),
       });
@@ -65,7 +61,8 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
     }
   }
 
-  Future<void> _showPaymentConfirmDialog(BuildContext context, String rideId) async {
+  Future<void> _showPaymentConfirmDialog(
+      BuildContext context, String rideId) async {
     if (_processingRideId == rideId) return;
 
     print("Showing payment dialog for ride: $rideId");
@@ -95,7 +92,6 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
 
   @override
   Widget build(BuildContext context) {
-
     final currentUser = ref.watch(currentUserProvider);
 
     return Scaffold(
@@ -113,28 +109,36 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
           final rides = snapshot.data ?? [];
           print("All rides length: ${rides.length}");
           for (var ride in rides) {
-            print("Ride ${ride['id']}: ${ride['destination']} - ${ride['status']}");
+            print(
+                "Ride ${ride['id']}: ${ride['destination']} - ${ride['status']}");
           }
 
           // Sort rides by distance
           final pendingRides = List<Map<String, dynamic>>.from(rides)
-            ..sort((a, b) => (a['distanceFromPassenger'] as num).compareTo(b['distanceFromPassenger'] as num));
+            ..sort((a, b) => (a['distanceFromPassenger'] as num)
+                .compareTo(b['distanceFromPassenger'] as num));
 
-          if (pendingRides.isEmpty && !_isProcessing) {
+          if (pendingRides.isEmpty) {
             print("No pending rides and not processing - navigating to home");
             Future.microtask(() {
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
+                (route) => false,
               );
             });
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Add this check before accessing first element
+          if (!mounted || pendingRides.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
           final currentRide = pendingRides.first;
           final rideStatus = currentRide['status'];
 
-          print("Current ride: ${currentRide['id']} - ${currentRide['status']}");
+          print(
+              "Current ride: ${currentRide['id']} - ${currentRide['status']}");
 
           if (rideStatus == 'paying' && !_isProcessing) {
             print("Showing payment dialog for current ride");
@@ -146,8 +150,11 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
 
           return Stack(
             children: [
-              const Positioned.fill(
-                child: SizedBox(), // Replace with map widget
+              Positioned.fill(
+                child: DriverTrackingMap(
+                  rides: pendingRides,
+                  driverId: currentUser['uid'],
+                ),
               ),
               Positioned(
                 bottom: 220,
@@ -161,7 +168,8 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                       color: Theme.of(context).colorScheme.onPrimary,
                       size: 30,
                     ),
-                    onPressed: () => _sendEmergencyAlert(currentRide['id'], currentUser['uid']),
+                    onPressed: () => _sendEmergencyAlert(
+                        currentRide['id'], currentUser['uid']),
                   ),
                 ),
               ),
@@ -182,16 +190,18 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                     children: [
                       Text(
                         currentRide['passengerName'],
-                        style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                            color: Colors.white
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge!
+                            .copyWith(color: Colors.white),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         currentRide['destination'],
-                        style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            color: Colors.white
-                        ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge!
+                            .copyWith(color: Colors.white),
                       ),
                     ],
                   ),

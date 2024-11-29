@@ -5,8 +5,6 @@ import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:manzil_app_v2/providers/user_ride_providers.dart';
 
-
-
 class UserActivityScreen extends ConsumerWidget {
   const UserActivityScreen({super.key});
 
@@ -27,7 +25,9 @@ class UserActivityScreen extends ConsumerWidget {
   Widget _buildRideCard(
       BuildContext context, Map<String, dynamic> ride, bool isDriver) {
     final status = ride['status'] as String;
-    final isAccepted = status == 'accepted' || status == 'picked' || ride['status'] == 'paying';
+    final isAccepted = status == 'accepted' ||
+        status == 'picked' ||
+        ride['status'] == 'paying';
 
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
@@ -53,7 +53,7 @@ class UserActivityScreen extends ConsumerWidget {
                 ),
                 Container(
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: isAccepted
                         ? Colors.green.withOpacity(0.1)
@@ -191,12 +191,11 @@ class UserActivityScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          status.isDriver
-                              ? 'No active rides'
-                              : 'No ride requests',
-                          style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                            color: const Color.fromRGBO(30, 60, 87, 1),
-                          ),
+                          'No Activity Yet',
+                          style:
+                              Theme.of(context).textTheme.titleLarge!.copyWith(
+                                    color: const Color.fromRGBO(30, 60, 87, 1),
+                                  ),
                         ),
                       ],
                     ),
@@ -218,7 +217,6 @@ class UserActivityScreen extends ConsumerWidget {
       ),
     );
   }
-
 }
 
 // Extension to capitalize first letter
@@ -227,5 +225,3 @@ extension StringExtension on String {
     return "${this[0].toUpperCase()}${substring(1)}";
   }
 }
-
-

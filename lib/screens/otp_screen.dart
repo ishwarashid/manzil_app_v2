@@ -152,19 +152,21 @@ class _OtpScreenState extends State<OtpScreen> {
                               final box = GetStorage();
                               box.write('phoneNumber', getPhoneNumber());
                               try {
-                                final QuerySnapshot querySnapshot =
-                                    await FirebaseFirestore.instance
-                                        .collection('users')
-                                        .where('phone_number',
-                                            isEqualTo: getPhoneNumber())
-                                        .limit(1)
-                                        .get();
-                                print(getPhoneNumber());
-                                print(querySnapshot.docs.first.data());
+                                final QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .where('phone_number', isEqualTo: getPhoneNumber())
+                                    .limit(1)
+                                    .get();
+
+                                // Remove this line as it can cause error
+                                // print(querySnapshot.docs.first.data());
 
                                 if (querySnapshot.docs.isNotEmpty) {
-                                  print("isNotEmpty");
+                                  // Only try to access data if we know docs is not empty
+                                  print("Existing user found");
                                   print(querySnapshot.docs.first.data());
+
+                                  if (!mounted) return;
                                   Navigator.of(context).pop();
                                   Navigator.of(context).pushReplacement(
                                     MaterialPageRoute(
@@ -172,8 +174,8 @@ class _OtpScreenState extends State<OtpScreen> {
                                     ),
                                   );
                                 } else {
-                                  // new user and also no phone number is saved, have to save everything
-                                  // print(querySnapshot.docs.first);
+                                  print("New user");
+                                  if (!mounted) return;
                                   Navigator.of(context).pushReplacement(
                                     MaterialPageRoute(
                                       builder: (context) => GetStartedScreen(phoneNumber: getPhoneNumber(),),
@@ -181,6 +183,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                   );
                                 }
                               } catch (e) {
+                                if (!mounted) return;
                                 ScaffoldMessenger.of(context).clearSnackBars();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(

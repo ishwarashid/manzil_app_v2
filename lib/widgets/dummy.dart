@@ -1,171 +1,224 @@
 // import 'package:flutter/material.dart';
+// import 'package:flutter_map/flutter_map.dart';
+// import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
+// import 'package:latlong2/latlong.dart';
 // import 'package:flutter_riverpod/flutter_riverpod.dart';
-// import 'package:manzil_app_v2/providers/current_user_provider.dart';
-// import 'package:manzil_app_v2/screens/chats_screen.dart';
-// import 'package:manzil_app_v2/screens/user_chat_screen.dart';
-// import 'package:manzil_app_v2/services/driver/driver_passenger_service.dart';
-// import 'package:manzil_app_v2/widgets/driver_card.dart';
+// import 'package:geolocator/geolocator.dart';
+// import 'dart:async';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 //
-// class FindDrivers extends ConsumerStatefulWidget {
-//   const FindDrivers({super.key});
+// class DriverTrackingMap extends ConsumerStatefulWidget {
+//   final List<Map<String, dynamic>> rides;
+//   final String driverId;
+//
+//   const DriverTrackingMap({
+//     required this.rides,
+//     required this.driverId,
+//     super.key,
+//   });
 //
 //   @override
-//   ConsumerState<FindDrivers> createState() => _FindDriversState();
+//   ConsumerState<DriverTrackingMap> createState() => _DriverTrackingMapState();
 // }
 //
-// class _FindDriversState extends ConsumerState<FindDrivers> {
-//   final _driverPassengerService = DriverPassengerService();
-//   bool _isAccepting = false;
+// class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
+//   final mapController = MapController();
+//   LatLng? currentLocation;
+//   Timer? _locationUpdateTimer;
 //
-//   Future<void> _acceptDriver(String rideId, Map<String, dynamic> driverInfo) async {
-//     if (_isAccepting) return;
+//   @override
+//   void initState() {
+//     super.initState();
+//     _getCurrentLocation();
+//     // Set up timer for location updates
+//     _locationUpdateTimer = Timer.periodic(
+//       const Duration(minutes: 2),
+//           (_) => _updateDriverLocation(),
+//     );
+//   }
 //
+//   @override
+//   void dispose() {
+//     _locationUpdateTimer?.cancel();
+//     super.dispose();
+//   }
+//
+//   Future<void> _getCurrentLocation() async {
 //     try {
-//       setState(() {
-//         _isAccepting = true;
-//       });
-//
-//       final currentUser = ref.read(currentUserProvider);
-//
-//       await _driverPassengerService.acceptDriver(
-//         rideId: rideId,
-//         currentUser: currentUser,
-//         driverInfo: driverInfo,
+//       final position = await Geolocator.getCurrentPosition(
+//           desiredAccuracy: LocationAccuracy.high
 //       );
-//       // Navigate to the chat screen
-//       if (mounted) {
-//         // First push the chats screen
-//         Navigator.pushReplacement(
-//           context,
-//           MaterialPageRoute(
-//             builder: (context) => const ChatsScreen(),
-//           ),
-//         );
 //
-//         // Then push the specific chat screen
-//         Navigator.push(
-//           context,
-//           MaterialPageRoute(
-//             builder: (context) => UserChatScreen(
-//               currentUser: currentUser,
-//               fullName: driverInfo['driverName'],
-//               receiverId: driverInfo['driverId'],
-//             ),
-//           ),
-//         );
-//       }
+//       setState(() {
+//         currentLocation = LatLng(position.latitude, position.longitude);
+//         mapController.move(currentLocation!, 15);
+//       });
 //     } catch (e) {
-//       if (mounted) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('Failed to accept driver: $e')),
-//         );
+//       print('Error getting location: $e');
+//     }
+//   }
+//
+//   Future<void> _updateDriverLocation() async {
+//     try {
+//       final position = await Geolocator.getCurrentPosition(
+//           desiredAccuracy: LocationAccuracy.high
+//       );
+//
+//       // Get current location text using reverse geocoding
+//       final locationText = await _getAddressFromCoordinates(position.latitude, position.longitude);
+//
+//       // Update driver location for all accepted rides
+//       final batch = FirebaseFirestore.instance.batch();
+//
+//       for (final ride in widget.rides) {
+//         if (ride['status'] == 'accepted') {
+//           final acceptedByRef = FirebaseFirestore.instance
+//               .collection('rides')
+//               .doc(ride['id'])
+//               .collection('acceptedBy')
+//               .doc(widget.driverId);
+//
+//           batch.update(acceptedByRef, {
+//             'driverLocation': locationText,
+//             'driverCoordinates': [position.latitude, position.longitude],
+//             'updatedAt': Timestamp.now(),
+//           });
+//         }
 //       }
-//     } finally {
-//       if (mounted) {
-//         setState(() {
-//           _isAccepting = false;
-//         });
-//       }
+//
+//       await batch.commit();
+//
+//       setState(() {
+//         currentLocation = LatLng(position.latitude, position.longitude);
+//       });
+//     } catch (e) {
+//       print('Error updating location: $e');
+//     }
+//   }
+//
+//   Future<String> _getAddressFromCoordinates(double lat, double lon) async {
+//     final url = Uri.parse(
+//         'https://nominatim.openstreetmap.org/reverse?format=json&accept-language=en-US&lat=$lat&lon=$lon&zoom=18&addressdetails=1'
+//     );
+//
+//     final response = await http.get(
+//         url,
+//         headers: {'Accept': 'application/json'}
+//     );
+//
+//     if (response.statusCode == 200) {
+//       final data = json.decode(response.body);
+//       return data['display_name'];
+//     } else {
+//       throw Exception('Failed to get address');
 //     }
 //   }
 //
 //   @override
 //   Widget build(BuildContext context) {
-//     final currentUser = ref.watch(currentUserProvider);
+//     if (currentLocation == null) {
+//       return const Center(child: CircularProgressIndicator());
+//     }
 //
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text("Found Drivers"),
+//     return FlutterMap(
+//       mapController: mapController,
+//       options: MapOptions(
+//         initialCenter: currentLocation!,
+//         initialZoom: 15,
 //       ),
-//       body: Padding(
-//         padding: const EdgeInsets.all(16),
-//         child: StreamBuilder<Map<String, dynamic>?>(
-//           stream: _driverPassengerService.getCurrentRide(currentUser['uid']),
-//           builder: (context, rideSnapshot) {
-//             if (rideSnapshot.connectionState == ConnectionState.waiting) {
-//               return const Center(child: CircularProgressIndicator());
-//             }
-//
-//             if (rideSnapshot.hasError) {
-//               return Center(child: Text('Error: ${rideSnapshot.error}'));
-//             }
-//
-//             final currentRide = rideSnapshot.data;
-//
-//             if (currentRide == null) {
-//               return Center(
-//                 child: Column(
-//                   mainAxisSize: MainAxisSize.min,
-//                   children: [
-//                     Text(
-//                       "No active ride request found",
-//                       style: Theme.of(context).textTheme.titleLarge!.copyWith(
-//                           color: const Color.fromRGBO(30, 60, 87, 1),
-//                           fontWeight: FontWeight.w500),
-//                       textAlign: TextAlign.center,
+//       children: [
+//         TileLayer(
+//           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+//           tileProvider: CancellableNetworkTileProvider(),
+//           userAgentPackageName: 'com.example.manzil_app',
+//         ),
+//         MarkerLayer(
+//           markers: [
+//             // Driver's current location marker
+//             Marker(
+//               point: currentLocation!,
+//               width: 80,
+//               height: 80,
+//               child: const Column(
+//                 children: [
+//                   Icon(
+//                     Icons.directions_car,
+//                     color: Colors.blue,
+//                     size: 30,
+//                   ),
+//                   Text(
+//                     'You',
+//                     style: TextStyle(
+//                       color: Colors.blue,
+//                       fontWeight: FontWeight.bold,
 //                     ),
-//                     const SizedBox(height: 10),
-//                     Text(
-//                       "Please create a ride request first",
-//                       style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-//                         color: const Color.fromRGBO(30, 60, 87, 1),
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//               );
-//             }
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             // Ride markers
+//             ...widget.rides.expand((ride) {
+//               final markers = <Marker>[];
 //
-//             return StreamBuilder<List<Map<String, dynamic>>>(
-//               stream: _driverPassengerService.getAcceptedDrivers(currentRide['id']),
-//               builder: (context, driversSnapshot) {
-//                 if (driversSnapshot.connectionState == ConnectionState.waiting) {
-//                   return const Center(child: CircularProgressIndicator());
-//                 }
-//
-//                 if (driversSnapshot.hasError) {
-//                   return Center(child: Text('Error: ${driversSnapshot.error}'));
-//                 }
-//
-//                 final drivers = driversSnapshot.data ?? [];
-//
-//                 if (drivers.isEmpty) {
-//                   return Center(
+//               // Add pickup marker if status is not 'picked'
+//               if (ride['status'] != 'picked') {
+//                 final pickupCoords = ride['pickupCoordinates'] as List;
+//                 markers.add(
+//                   Marker(
+//                     point: LatLng(pickupCoords[0], pickupCoords[1]),
+//                     width: 80,
+//                     height: 80,
 //                     child: Column(
-//                       mainAxisSize: MainAxisSize.min,
 //                       children: [
-//                         Text(
-//                           "No drivers have accepted yet!",
-//                           style: Theme.of(context).textTheme.titleLarge!.copyWith(
-//                               color: const Color.fromRGBO(30, 60, 87, 1),
-//                               fontWeight: FontWeight.w500),
-//                           textAlign: TextAlign.center,
+//                         const Icon(
+//                           Icons.location_on,
+//                           color: Colors.green,
+//                           size: 30,
 //                         ),
-//                         const SizedBox(height: 10),
 //                         Text(
-//                           "Please check again in a few minutes",
-//                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-//                             color: const Color.fromRGBO(30, 60, 87, 1),
+//                           '${ride['passengerName']} Pickup',
+//                           style: const TextStyle(
+//                             color: Colors.green,
+//                             fontWeight: FontWeight.bold,
 //                           ),
 //                         ),
 //                       ],
 //                     ),
-//                   );
-//                 }
-//
-//                 return ListView.builder(
-//                   itemCount: drivers.length,
-//                   itemBuilder: (context, index) => DriverCard(
-//                     driverInfo: drivers[index],
-//                     onAccept: () => _acceptDriver(currentRide['id'], drivers[index]),
-//                     isAccepting: _isAccepting,
 //                   ),
 //                 );
-//               },
-//             );
-//           },
+//               }
+//
+//               // Add destination marker
+//               final destCoords = ride['destinationCoordinates'] as List;
+//               markers.add(
+//                 Marker(
+//                   point: LatLng(destCoords[0], destCoords[1]),
+//                   width: 80,
+//                   height: 80,
+//                   child: Column(
+//                     children: [
+//                       const Icon(
+//                         Icons.flag,
+//                         color: Colors.red,
+//                         size: 30,
+//                       ),
+//                       Text(
+//                         '${ride['passengerName']} Dest.',
+//                         style: const TextStyle(
+//                           color: Colors.red,
+//                           fontWeight: FontWeight.bold,
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               );
+//
+//               return markers;
+//             }),
+//           ],
 //         ),
-//       ),
+//       ],
 //     );
 //   }
 // }
