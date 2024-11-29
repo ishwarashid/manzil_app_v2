@@ -118,7 +118,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
 
           // Sort rides by distance
           final pendingRides = List<Map<String, dynamic>>.from(rides)
-            ..sort((a, b) => (a['distance'] as num).compareTo(b['distance'] as num));
+            ..sort((a, b) => (a['distanceFromPassenger'] as num).compareTo(b['distanceFromPassenger'] as num));
 
           if (pendingRides.isEmpty && !_isProcessing) {
             print("No pending rides and not processing - navigating to home");

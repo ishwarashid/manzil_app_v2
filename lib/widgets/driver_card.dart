@@ -43,7 +43,7 @@ class DriverCard extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      "${driverInfo["distance"].toStringAsFixed(1)} km away",
+                      "${driverInfo["distanceFromPassenger"].toStringAsFixed(1)} km away",
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.secondary,
                       ),

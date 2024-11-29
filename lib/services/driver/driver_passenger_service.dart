@@ -39,7 +39,10 @@ class DriverPassengerService {
         return {
           'driverId': doc.id,
           'driverName': data['driverName'],
-          'distance': data['distance'],
+          'driverLocation': data['driverLocation'],
+          'driverCoordinates': data['driverCoordinates'],
+          'distanceFromPassenger': data['distanceFromPassenger'],
+          'driverDistanceFromDestination': data['distanceFromPassenger'],
           'calculatedFare': data['calculatedFare'],
           'timestamp': data['timestamp'],
         };
@@ -88,7 +91,10 @@ class DriverPassengerService {
         'status': 'accepted',
         'selectedDriverId': driverInfo['driverId'],
         'driverName': driverInfo['driverName'],
-        'distance': driverInfo['distance'],
+        'driverLocation': driverInfo['driverLocation'],
+        'driverCoordinates': driverInfo['driverCoordinates'],
+        'distanceFromPassenger': driverInfo['distanceFromPassenger'],
+        'driverDistanceFromDestination': driverInfo['driverDistanceFromDestination'],
         'calculatedFare': driverInfo['calculatedFare'],
         'acceptedAt': Timestamp.now(),
       });
@@ -101,7 +107,7 @@ class DriverPassengerService {
         'driverName': driverInfo['driverName'],
         'passengerId': currentUser['uid'],
         'passengerName': "${currentUser['first_name']} ${currentUser['last_name']}",
-        'distance': driverInfo['distance'],
+        'distanceFromPassenger': driverInfo['distanceFromPassenger'],
         'calculatedFare': driverInfo['calculatedFare'],
         'status': 'ongoing',
         'startTime': Timestamp.now(),

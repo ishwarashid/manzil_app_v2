@@ -206,7 +206,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
           final pendingRides = List<Map<String, dynamic>>.from(
               status.activeRidesWithCompleted.where((ride) => ride['status'] != 'completed'))
             ..sort((a, b) =>
-                (a['distance'] as num).compareTo(b['distance'] as num));
+                (a['distanceFromPassenger'] as num).compareTo(b['distanceFromPassenger'] as num));
 
           if (pendingRides.isEmpty) {
             final completedRides = status.activeRidesWithCompleted

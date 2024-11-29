@@ -144,6 +144,7 @@ class _RideInputsState extends ConsumerState<RideInputs> {
         'pickupLocation': bookingInputs['pickup'],
         'pickupCoordinates': pickupCoordinates,
         'destination': bookingInputs['destination'],
+        'destinationCoordinates': bookingInputs['destinationCoordinates'],
         'seats': bookingInputs['seats'],
         'offeredFare': bookingInputs['fare'],
         'isPrivate': bookingInputs['private'],

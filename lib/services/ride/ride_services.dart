@@ -1,4 +1,8 @@
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 class RidesService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -93,12 +97,16 @@ class RidesService {
     try {
       // First get the ride details
       final rideDoc = await _firestore.collection('rides').doc(rideId).get();
+      final controlsDoc = await _firestore.collection('controls').get();
 
       if (!rideDoc.exists) {
         throw Exception('Ride not found');
       }
 
       final rideData = rideDoc.data() as Map<String, dynamic>;
+      print(rideData);
+      final controlData = controlsDoc.docs.first.data();;
+      print(controlData);
       final isPrivate = rideData['isPrivate'] as bool;
 
       if (isPrivate) {
@@ -110,7 +118,6 @@ class RidesService {
         }
       }
 
-
       final hasPrivateRides = await hasPrivateRide(driverInfo['uid']);
       if (hasPrivateRides) {
         throw Exception(
@@ -118,7 +125,38 @@ class RidesService {
         );
       }
 
-      // If we get here, driver can accept the ride
+      // Get coordinates for calculations
+      final driverCoordinates = driverInfo['coordinates'] as List;
+      final pickupCoordinates = rideData['pickupCoordinates'] as List;
+      final destinationCoordinates = rideData['destinationCoordinates'] as List;
+
+      // Calculate distances using Geolocator
+      final distanceFromPassenger = await Geolocator.distanceBetween(
+          driverCoordinates[0],
+          driverCoordinates[1],
+          pickupCoordinates[0],
+          pickupCoordinates[1]
+      );
+
+      final distanceFromDestination = await Geolocator.distanceBetween(
+          driverCoordinates[0],
+          driverCoordinates[1],
+          destinationCoordinates[0],
+          destinationCoordinates[1]
+      );
+
+      // Get rates from controls
+      final petrolRate = controlData['petrolRate'] as double;
+      final litersPerMeter = controlData['litersPerMeter'] as double;
+      int calculatedFare;
+
+      // Calculate fare
+      if (isPrivate) {
+        calculatedFare = ((litersPerMeter * petrolRate * distanceFromDestination) * 2.5).ceil();
+      } else {
+        calculatedFare = (litersPerMeter * petrolRate * distanceFromDestination).ceil();
+      }
+
       await _firestore
           .collection('rides')
           .doc(rideId)
@@ -126,8 +164,11 @@ class RidesService {
           .doc(driverInfo['uid'])
           .set({
         'driverName': "${driverInfo['first_name']} ${driverInfo['last_name']}",
-        'distance': 2.0, // You might want to calculate this dynamically
-        'calculatedFare': 200, // You might want to calculate this dynamically
+        'driverLocation': driverInfo['location_text'],
+        'driverCoordinates': driverCoordinates,
+        'distanceFromPassenger': distanceFromPassenger,
+        'calculatedFare': calculatedFare,
+        'driverDistanceFromDestination': distanceFromDestination,
         'timestamp': Timestamp.now(),
       });
 
@@ -170,7 +211,7 @@ class RidesService {
             'isPrivate': doc['isPrivate'],
             'status': doc['status'],
             'calculatedFare': acceptedData['calculatedFare'],
-            'distance': acceptedData['distance'],
+            'distanceFromPassenger': acceptedData['distanceFromPassenger'],
             'acceptedAt': acceptedData['timestamp'],
           });
         }
