@@ -168,8 +168,43 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                       color: Theme.of(context).colorScheme.onPrimary,
                       size: 30,
                     ),
-                    onPressed: () => _sendEmergencyAlert(
-                        currentRide['id'], currentUser['uid']),
+                    onPressed: () async {
+                      try {
+                        await _sendEmergencyAlert(
+                          currentRide['id'],
+                          currentUser['uid'],
+                        );
+                        if (mounted) {
+                          showDialog(
+                            barrierDismissible: false,
+                            context: context,
+                            builder: (context) {
+                              Future.delayed(const Duration(seconds: 2),
+                                      () {
+                                    Navigator.of(context).pop(true);
+                                  });
+                              return const AlertDialog(
+                                title: Text(
+                                  "Emergency Alert Sent!",
+                                  style: TextStyle(fontSize: 20),
+                                ),
+                                icon: Icon(
+                                  Icons.emergency_share_rounded,
+                                  size: 30,
+                                ),
+                                iconColor: Colors.redAccent,
+                              );
+                            },
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ),
               ),

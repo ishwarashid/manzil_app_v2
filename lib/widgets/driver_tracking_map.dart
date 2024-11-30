@@ -9,14 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// here i also wanna add some route deviation logic
-// when driver has picked up all the passengers (when status of all rides is picked)
-// the distance of driver from destination of passenger(one by one) should be monitored after every 2 min
-// its should be compared to distance 2 min ago
-// if the distance increases a timer should start which after 10 mins should issue emergeny by making an entry
-// inside emergencies collection (pushed by field will be the passenger's id, and reason  will be route deviation)
-// but timer will be stopped if we check the distance again after 2 mins and it is decreasing.
-// then same things will happen to other rides as well after current ride completes.
+import 'package:manzil_app_v2/services/route/route_monitoring_service.dart';
 
 class DriverTrackingMap extends ConsumerStatefulWidget {
   final List<Map<String, dynamic>> rides;
@@ -35,17 +28,13 @@ class DriverTrackingMap extends ConsumerStatefulWidget {
 class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
   final mapController = MapController();
   LatLng? currentLocation;
-  Timer? _databaseUpdateTimer;
   StreamSubscription<Position>? _locationStreamSubscription;
-
-  Timer? _routeMonitoringTimer;
-  Map<String, double> _lastDistances = {};
-  Map<String, Timer?> _deviationTimers = {};
-  static const deviationThreshold = Duration(seconds: 20); // make it 10
+  Timer? _databaseUpdateTimer;
 
   @override
   void initState() {
     super.initState();
+    ref.read(routeMonitoringProvider.notifier).setContext(context);
     _checkAndRequestPermissions();
   }
 
@@ -53,91 +42,7 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
   void dispose() {
     _locationStreamSubscription?.cancel();
     _databaseUpdateTimer?.cancel();
-    _routeMonitoringTimer?.cancel();
-    // Cancel all deviation timers
-    for (var timer in _deviationTimers.values) {
-      timer?.cancel();
-    }
     super.dispose();
-  }
-
-  void _startRouteMonitoring() {
-    _routeMonitoringTimer = Timer.periodic(
-      const Duration(seconds: 10),// make it minute: 2
-          (_) => _checkRouteDeviation(),
-    );
-  }
-
-  Future<void> _checkRouteDeviation() async {
-    if (currentLocation == null) return;
-
-    // Only monitor if all rides are picked
-    final pickedRides = widget.rides.where((ride) => ride['status'] == 'picked').toList();
-    if (pickedRides.length != widget.rides.length) return;
-
-    for (final ride in pickedRides) {
-      final rideId = ride['id'] as String;
-      final destCoords = ride['destinationCoordinates'] as List;
-      final passengerId = ride['passengerID'] as String;
-
-      // Calculate current distance to destination
-      final currentDistance = await Geolocator.distanceBetween(
-        currentLocation!.latitude,
-        currentLocation!.longitude,
-        destCoords[0],
-        destCoords[1],
-      );
-
-      // Get last recorded distance
-      final lastDistance = _lastDistances[rideId];
-
-      if (lastDistance != null) {
-        // Check if distance is increasing (with small buffer for GPS accuracy)
-        if (currentDistance > lastDistance + 50) { // 50 meters buffer
-          // Start deviation timer if not already started
-          _deviationTimers[rideId] ??= Timer(deviationThreshold, () {
-            _reportRouteDeviation(rideId, passengerId);
-          });
-        } else if (currentDistance < lastDistance) {
-          // Distance is decreasing, cancel deviation timer if exists
-          _deviationTimers[rideId]?.cancel();
-          _deviationTimers[rideId] = null;
-        }
-      }
-
-      // Update last distance
-      _lastDistances[rideId] = currentDistance;
-    }
-  }
-
-  Future<void> _reportRouteDeviation(String rideId, String passengerId) async {
-    try {
-      await FirebaseFirestore.instance.collection('emergencies').add({
-        'pushedBy': passengerId,
-        'rideId': rideId,
-        'reason': 'route deviation',
-        'timestamp': Timestamp.now(),
-      });
-
-      // Clear timer after reporting
-      _deviationTimers[rideId]?.cancel();
-      _deviationTimers[rideId] = null;
-
-      print('Route deviation emergency reported for ride: $rideId');
-    } catch (e) {
-      print('Error reporting route deviation: $e');
-    }
-  }
-
-  void _startDatabaseUpdates() {
-    _databaseUpdateTimer = Timer.periodic(
-      const Duration(minutes: 2),
-          (_) {
-        _updateDriverLocationInDatabase();
-        // Start route monitoring after location is updated
-        _startRouteMonitoring();
-      },
-    );
   }
 
   Future<void> _checkAndRequestPermissions() async {
@@ -156,7 +61,6 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
       return;
     }
 
-    // Once we have permissions, initialize everything
     _initializeLocation();
     _startLocationStream();
     _startDatabaseUpdates();
@@ -176,13 +80,20 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
         print('Setting current location: $currentLocation');
         mapController.move(currentLocation!, 15);
       });
+
+      // Start monitoring with initial position if rides exist
+      if (widget.rides.isNotEmpty) {
+        ref.read(routeMonitoringProvider.notifier).startMonitoring(
+          widget.rides,
+          position,
+        );
+      }
     } catch (e) {
       print('Error getting initial location: $e');
     }
   }
 
   void _startLocationStream() {
-    print('Starting location stream...');
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 10,
@@ -191,15 +102,28 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
     _locationStreamSubscription = Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen(
-            (Position position) {
-          print('New position from stream: ${position.latitude}, ${position.longitude}');
-          setState(() {
-            currentLocation = LatLng(position.latitude, position.longitude);
-          });
-        },
-        onError: (e) {
-          print('Error in location stream: $e');
+          (Position position) {
+        print('New position from stream: ${position.latitude}, ${position.longitude}');
+        setState(() {
+          currentLocation = LatLng(position.latitude, position.longitude);
+        });
+
+        // Update route monitoring with new position
+        if (widget.rides.isNotEmpty) {
+          ref.read(routeMonitoringProvider.notifier).startMonitoring(
+            widget.rides,
+            position,
+          );
         }
+      },
+      onError: (e) => print('Location stream error: $e'),
+    );
+  }
+
+  void _startDatabaseUpdates() {
+    _databaseUpdateTimer = Timer.periodic(
+      const Duration(minutes: 2),
+          (_) => _updateDriverLocationInDatabase(),
     );
   }
 
@@ -257,11 +181,36 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
   }
 
   @override
+  void didUpdateWidget(DriverTrackingMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Update monitoring if rides change
+    if (currentLocation != null && widget.rides != oldWidget.rides) {
+      final position = Position(
+        latitude: currentLocation!.latitude,
+        longitude: currentLocation!.longitude,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        heading: 0,
+        speed: 0,
+        speedAccuracy: 0,
+        altitudeAccuracy: 0,
+        headingAccuracy: 0,  // Add this
+      );
+
+      ref.read(routeMonitoringProvider.notifier).startMonitoring(
+        widget.rides,
+        position,
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     print('Building map with current location: $currentLocation');
     print('Number of rides: ${widget.rides.length}');
 
-    // Default to a specific location if no current location yet
     final center = currentLocation ?? const LatLng(24.8607, 67.0011);
 
     return FlutterMap(
@@ -276,10 +225,9 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
           tileProvider: CancellableNetworkTileProvider(),
           userAgentPackageName: 'com.example.manzil_app',
         ),
-        if (currentLocation != null || widget.rides.isNotEmpty)  // Only show MarkerLayer if we have markers
+        if (currentLocation != null || widget.rides.isNotEmpty)
           MarkerLayer(
             markers: [
-              // Current location marker
               if (currentLocation != null)
                 Marker(
                   point: currentLocation!,
@@ -302,7 +250,6 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
                     ],
                   ),
                 ),
-              // Ride markers
               ...widget.rides.expand((ride) {
                 final markers = <Marker>[];
                 print('Processing ride: ${ride['id']}');
@@ -328,7 +275,7 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
                             style: const TextStyle(
                               color: Colors.green,
                               fontWeight: FontWeight.bold,
-                              fontSize: 10
+                              fontSize: 10,
                             ),
                           ),
                         ],
@@ -373,3 +320,5 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
     );
   }
 }
+
+
