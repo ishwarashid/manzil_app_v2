@@ -45,6 +45,36 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(DriverTrackingMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Instead of directly calling startMonitoring, schedule it for the next frame
+    if (currentLocation != null && widget.rides != oldWidget.rides) {
+      // Use microtask to ensure we're not in a build phase
+      Future.microtask(() {
+        if (!mounted) return;
+        final position = Position(
+          latitude: currentLocation!.latitude,
+          longitude: currentLocation!.longitude,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          heading: 0,
+          speed: 0,
+          speedAccuracy: 0,
+          altitudeAccuracy: 0,
+          headingAccuracy: 0,
+        );
+
+        ref.read(routeMonitoringProvider.notifier).startMonitoring(
+          widget.rides,
+          position,
+        );
+      });
+    }
+  }
+
   Future<void> _checkAndRequestPermissions() async {
     LocationPermission permission = await Geolocator.checkPermission();
 
@@ -67,26 +97,27 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
   }
 
   Future<void> _initializeLocation() async {
-    print('Initializing location...');
     try {
       final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high
       );
 
-      print('Got initial position: ${position.latitude}, ${position.longitude}');
+      if (!mounted) return;
 
       setState(() {
         currentLocation = LatLng(position.latitude, position.longitude);
-        print('Setting current location: $currentLocation');
         mapController.move(currentLocation!, 15);
       });
 
-      // Start monitoring with initial position if rides exist
+      // Use microtask for route monitoring
       if (widget.rides.isNotEmpty) {
-        ref.read(routeMonitoringProvider.notifier).startMonitoring(
-          widget.rides,
-          position,
-        );
+        Future.microtask(() {
+          if (!mounted) return;
+          ref.read(routeMonitoringProvider.notifier).startMonitoring(
+            widget.rides,
+            position,
+          );
+        });
       }
     } catch (e) {
       print('Error getting initial location: $e');
@@ -108,12 +139,16 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
           currentLocation = LatLng(position.latitude, position.longitude);
         });
 
-        // Update route monitoring with new position
+        // Update route monitoring after state is set
         if (widget.rides.isNotEmpty) {
-          ref.read(routeMonitoringProvider.notifier).startMonitoring(
-            widget.rides,
-            position,
-          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ref.read(routeMonitoringProvider.notifier).startMonitoring(
+                widget.rides,
+                position,
+              );
+            }
+          });
         }
       },
       onError: (e) => print('Location stream error: $e'),
@@ -180,31 +215,6 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
     }
   }
 
-  @override
-  void didUpdateWidget(DriverTrackingMap oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // Update monitoring if rides change
-    if (currentLocation != null && widget.rides != oldWidget.rides) {
-      final position = Position(
-        latitude: currentLocation!.latitude,
-        longitude: currentLocation!.longitude,
-        timestamp: DateTime.now(),
-        accuracy: 0,
-        altitude: 0,
-        heading: 0,
-        speed: 0,
-        speedAccuracy: 0,
-        altitudeAccuracy: 0,
-        headingAccuracy: 0,  // Add this
-      );
-
-      ref.read(routeMonitoringProvider.notifier).startMonitoring(
-        widget.rides,
-        position,
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -257,6 +267,7 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
                 if (ride['status'] != 'picked' &&
                     ride['pickupCoordinates'] != null &&
                     (ride['pickupCoordinates'] as List).length >= 2) {
+                  print(ride['status']);
                   final pickupCoords = ride['pickupCoordinates'] as List;
                   markers.add(
                     Marker(

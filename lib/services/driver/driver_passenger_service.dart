@@ -39,6 +39,7 @@ class DriverPassengerService {
         return {
           'driverId': doc.id,
           'driverName': data['driverName'],
+          'driverNumber': doc['driverNumber'],
           'driverLocation': data['driverLocation'],
           'driverCoordinates': data['driverCoordinates'],
           'distanceFromPassenger': data['distanceFromPassenger'],
@@ -82,15 +83,14 @@ class DriverPassengerService {
         );
       }
 
-      // Start a batch write
-      final batch = _firestore.batch();
-
       // Update the main ride document
       final rideRef = _firestore.collection('rides').doc(rideId);
-      batch.update(rideRef, {
+      await rideRef.update({
         'status': 'accepted',
         'selectedDriverId': driverInfo['driverId'],
+        'driverNumber': driverInfo['driverNumber'],
         'driverName': driverInfo['driverName'],
+        'passengerNumber': ['passengerNumber'],
         'driverLocation': driverInfo['driverLocation'],
         'driverCoordinates': driverInfo['driverCoordinates'],
         'distanceFromPassenger': driverInfo['distanceFromPassenger'],
@@ -98,26 +98,6 @@ class DriverPassengerService {
         'calculatedFare': driverInfo['calculatedFare'],
         'acceptedAt': Timestamp.now(),
       });
-
-      // Create trip document
-      final tripRef = _firestore.collection('trips').doc();
-      batch.set(tripRef, {
-        'rideId': rideId,
-        'driverId': driverInfo['driverId'],
-        'driverName': driverInfo['driverName'],
-        'passengerId': currentUser['uid'],
-        'passengerName': "${currentUser['first_name']} ${currentUser['last_name']}",
-        'distanceFromPassenger': driverInfo['distanceFromPassenger'],
-        'calculatedFare': driverInfo['calculatedFare'],
-        'status': 'ongoing',
-        'startTime': Timestamp.now(),
-        'pickupLocation': null,
-        'dropoffLocation': null,
-        'actualFare': null,
-      });
-
-      // Execute batch
-      await batch.commit();
 
       // Create chat room
       await _chatService.createChatRoom(currentUser, driverInfo['driverId']);
@@ -153,24 +133,6 @@ class DriverPassengerService {
     } catch (e) {
       print('Error canceling other drivers: $e');
       throw Exception('Failed to cancel other drivers');
-    }
-  }
-
-  // Method to complete a ride
-  Future<void> completeRide(String tripId, {
-    required Map<String, dynamic> dropoffLocation,
-    required double actualFare,
-  }) async {
-    try {
-      await _firestore.collection('trips').doc(tripId).update({
-        'status': 'completed',
-        'endTime': Timestamp.now(),
-        'dropoffLocation': dropoffLocation,
-        'actualFare': actualFare,
-      });
-    } catch (e) {
-      print('Error completing ride: $e');
-      throw Exception('Failed to complete ride');
     }
   }
 }

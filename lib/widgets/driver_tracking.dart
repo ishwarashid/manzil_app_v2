@@ -61,27 +61,133 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
     }
   }
 
-  Future<void> _showPaymentConfirmDialog(
-      BuildContext context, String rideId) async {
-    if (_processingRideId == rideId) return;
+  Future<void> _deleteChatRoom(String driverId, String passengerId) async {
+    try {
+      // Create chatRoomId using the same logic
+      List<String> ids = [driverId, passengerId];
+      ids.sort();
+      String chatRoomId = ids.join("_");
 
-    print("Showing payment dialog for ride: $rideId");
+      // Delete the chat room
+      await FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(chatRoomId)
+          .delete();
+
+      print('Chat room deleted: $chatRoomId');
+    } catch (e) {
+      print('Error deleting chat room: $e');
+    }
+  }
+
+  Future<void> _showPaymentConfirmDialog(
+      BuildContext context, Map<String, dynamic> ride) async {
+    if (_processingRideId == ride['id']) return;
+
+    print("Showing payment dialog for ride: ${ride['id']}");
+
+    final paymentMethod = ride['paymentMethod'] as String? ?? 'cash';
+    final formattedPaymentMethod = paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
+
+    // Store ScaffoldMessenger reference
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    Future<void> reportFraud() async {
+      try {
+        // Create a local copy of all operations
+        final Future<void> statusUpdate = _updateRideStatus(ride['id'], 'completed');
+        final Future<void> fraudReport = FirebaseFirestore.instance.collection('frauds').add({
+          'fraudUserId': ride['passengerID'],
+          'rideId': ride['id'],
+          'reason': 'payment',
+          'timestamp': Timestamp.now(),
+        });
+        final Future<void> chatRoomDeletion = _deleteChatRoom(
+          ride['selectedDriverId'],
+          ride['passengerID'],
+        );
+
+        // Wait for all operations to complete
+        await Future.wait([statusUpdate, fraudReport, chatRoomDeletion]);
+
+        if (mounted) {
+          Future.microtask(() {
+            try {
+              scaffoldMessenger.clearSnackBars();
+              scaffoldMessenger.showSnackBar(
+                const SnackBar(
+                  content: Text('Fraud report submitted'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            } catch (e) {
+              print('Error showing snackbar: $e');
+            }
+          });
+        }
+      } catch (e) {
+        print('Error reporting fraud: $e');
+        if (mounted) {
+          Future.microtask(() {
+            try {
+              scaffoldMessenger.clearSnackBars();
+              scaffoldMessenger.showSnackBar(
+                SnackBar(
+                  content: Text('Error reporting fraud: $e'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            } catch (e) {
+              print('Error showing error snackbar: $e');
+            }
+          });
+        }
+      }
+    }
 
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext ctx) => AlertDialog(
         title: const Text('Confirm Payment'),
-        content: const Text('Has the passenger paid the fare?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Payment Method: $formattedPaymentMethod'),
+            const SizedBox(height: 16),
+            const Text('Has the passenger paid the fare?'),
+          ],
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Future.microtask(() {
+                if (mounted) {
+                  reportFraud();
+                }
+              });
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
             child: const Text('No'),
           ),
           FilledButton(
-            onPressed: () async {
+            onPressed: () {
               Navigator.of(ctx).pop();
-              await _updateRideStatus(rideId, 'completed');
+              Future.microtask(() async {
+                if (mounted) {
+                  await _updateRideStatus(ride['id'], 'completed');
+                  await _deleteChatRoom(
+                    ride['selectedDriverId'], // Current driver's ID
+                    ride['passengerID'], // Passenger's ID
+                  );
+                }
+              });
             },
             child: const Text('Yes'),
           ),
@@ -89,6 +195,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -119,11 +226,12 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                 .compareTo(b['distanceFromPassenger'] as num));
 
           if (pendingRides.isEmpty) {
-            print("No pending rides and not processing - navigating to home");
+            // Use microtask for navigation
             Future.microtask(() {
+              if (!mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const HomeScreen()),
-                (route) => false,
+                    (route) => false,
               );
             });
             return const Center(child: CircularProgressIndicator());
@@ -144,7 +252,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
             print("Showing payment dialog for current ride");
             Future.microtask(() {
               if (!mounted) return;
-              _showPaymentConfirmDialog(context, currentRide['id']);
+              _showPaymentConfirmDialog(context, currentRide);
             });
           }
 

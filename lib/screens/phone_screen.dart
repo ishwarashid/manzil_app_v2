@@ -1,5 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -17,12 +17,135 @@ class _PhoneScreenState extends State<PhoneScreen> {
   final _phoneNumberController = TextEditingController();
   bool _isProcessing = false;
 
+  String? _validatePhoneNumber(String phoneNumber) {
+    // Remove any whitespace
+    phoneNumber = phoneNumber.trim();
+
+    // Check if empty
+    if (phoneNumber.isEmpty) {
+      return 'Phone number is required';
+    }
+
+    // Check if starts with 0 or 3
+    if (!phoneNumber.startsWith('0') && !phoneNumber.startsWith('3')) {
+      return 'Phone number must start with 0 or 3';
+    }
+
+    // Check length (10 digits if starts with 3, 11 digits if starts with 0)
+    if ((phoneNumber.startsWith('3') && phoneNumber.length != 10) ||
+        (phoneNumber.startsWith('0') && phoneNumber.length != 11)) {
+      return 'Invalid phone number length';
+    }
+
+    // Check if contains only digits
+    if (!RegExp(r'^[0-9]+$').hasMatch(phoneNumber)) {
+      return 'Phone number can only contain digits';
+    }
+
+    return null;
+  }
+
   String _formatPhoneNumber() {
-    final userPhoneNo = _phoneNumberController.text;
+    final userPhoneNo = _phoneNumberController.text.trim();
     if (userPhoneNo[0] == '0') {
       return "+92${userPhoneNo.substring(1)}";
     }
     return "+92$userPhoneNo";
+  }
+
+  Future<bool> _checkIfUserBanned(String phoneNumber) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('phone_number', isEqualTo: phoneNumber)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        final userData = querySnapshot.docs.first.data();
+        return userData['isBanned'] == true;
+      }
+
+      return false;
+    } catch (e) {
+      print('Error checking user ban status: $e');
+      return false;
+    }
+  }
+
+  Future<void> _handlePhoneSubmission() async {
+    // First validate the phone number
+    final validationError = _validatePhoneNumber(_phoneNumberController.text);
+    if (validationError != null) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(validationError),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isProcessing = true;
+    });
+
+    try {
+      FocusScope.of(context).unfocus();
+      _phoneNumber = _formatPhoneNumber();
+
+      // Check if user is banned
+      final isBanned = await _checkIfUserBanned(_phoneNumber);
+      if (isBanned) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Your account has been banned. Please contact support.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        setState(() {
+          _isProcessing = false;
+        });
+        return;
+      }
+
+      // If not banned, proceed with sending OTP
+      final statusCode = await _sendCode();
+
+      if (statusCode == 200) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => OtpScreen(phoneNumber: _phoneNumber),
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Error Occurred: Failed to send otp."),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
   }
 
   Future<int> _sendCode() async {
@@ -103,56 +226,19 @@ class _PhoneScreenState extends State<PhoneScreen> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onPrimary,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
                         textStyle: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.w500),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      onPressed: _isProcessing
-                          ? null
-                          : () {
-                              // print(_phoneNumberController.text);
-                              setState(() {
-                                _isProcessing = true;
-                              });
-                              // FocusScope.of(context).requestFocus(FocusNode());
-                              FocusScope.of(context).unfocus();
-                              _phoneNumber = _formatPhoneNumber();
-                              _sendCode().then((statusCode) {
-                                if (statusCode == 200) {
-                                  setState(() {
-                                    _isProcessing = false;
-                                  });
-                                  Navigator.of(context).pushReplacement(
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          OtpScreen(phoneNumber: _phoneNumber),
-                                    ),
-                                  );
-                                } else {
-                                  setState(() {
-                                    _isProcessing = false;
-                                  });
-                                  ScaffoldMessenger.of(context)
-                                      .clearSnackBars();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          "Error Occurred: Failed to send otp."),
-                                    ),
-                                  );
-                                }
-                              });
-                            },
+                      onPressed: _isProcessing ? null : _handlePhoneSubmission,
                       child: _isProcessing
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  // color: Theme.of(context).colorScheme.onPrimary,
-                                  // backgroundColor: Theme.of(context).colorScheme.primary,
-                                  ),
-                            )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(),
+                      )
                           : const Text("Receive OTP"),
                     ),
                   )

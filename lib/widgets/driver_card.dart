@@ -16,9 +16,33 @@ class DriverCard extends ConsumerWidget {
     super.key,
   });
 
+  String _getEstimatedTime(double distanceInMeters) {
+    // Average speed: 30 km/h = 8.33 m/s
+    const averageSpeedInMetersPerSecond = 8.33;
+
+    // Calculate time in seconds
+    final timeInSeconds = distanceInMeters / averageSpeedInMetersPerSecond;
+
+    // Convert to minutes
+    final minutes = timeInSeconds / 60;
+
+    if (minutes < 1) {
+      return "Less than a minute away";
+    } else if (minutes < 60) {
+      final roundedMinutes = minutes.round();
+      return "$roundedMinutes ${roundedMinutes == 1 ? 'minute' : 'minutes'} away";
+    } else {
+      final hours = minutes / 60;
+      final roundedHours = hours.round();
+      return "$roundedHours ${roundedHours == 1 ? 'hour' : 'hours'} away";
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.read(currentUserProvider);
+    final distance = driverInfo["distanceFromPassenger"] as double;
+    final estimatedTime = _getEstimatedTime(distance);
 
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
@@ -31,24 +55,36 @@ class DriverCard extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      driverInfo["driverName"] as String,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Color.fromARGB(255, 45, 45, 45),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        driverInfo["driverName"] as String,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Color.fromARGB(255, 45, 45, 45),
+                        ),
                       ),
-                    ),
-                    Text(
-                      "${driverInfo["distanceFromPassenger"].toStringAsFixed(1)} km away",
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.secondary,
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            estimatedTime,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Row(
                   children: [
@@ -79,18 +115,17 @@ class DriverCard extends ConsumerWidget {
                               currentUser: currentUser,
                               fullName: driverInfo["driverName"] as String,
                               receiverId: driverInfo["driverId"],
+                              receiverNumber: driverInfo["driverNumber"],
                             ),
                           ),
                         );
-                      }, // Chat functionality handled in parent
+                      },
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(
-              height: 20,
-            ),
+            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -106,14 +141,13 @@ class DriverCard extends ConsumerWidget {
                   ),
                   child: isAccepting
                       ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
                       : const Text("Book"),
                 ),
               ],

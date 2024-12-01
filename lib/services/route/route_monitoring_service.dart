@@ -22,25 +22,32 @@ class RouteMonitoringService extends StateNotifier<Map<String, dynamic>> {
   }
 
   Timer? _monitoringTimer;
-  static const deviationThreshold = Duration(seconds: 20);
-  static const distanceCheckInterval = Duration(seconds: 10);
+  static const deviationThreshold = Duration(seconds: 20); // 10 mins
+  static const distanceCheckInterval = Duration(seconds: 10); // 2 mins
   static const deviationBuffer = 50.0;
   static const emergencyCooldown = Duration(seconds: 10); // 5 mins
 
   void startMonitoring(List<Map<String, dynamic>> rides, Position currentPosition) {
     print('Starting route monitoring with ${rides.length} rides');
 
-    if (state['isMonitoring'] == true) {
-      print('Already monitoring, canceling previous timer');
-      _monitoringTimer?.cancel();
-    }
+    // Cancel existing timer before starting new one
+    _monitoringTimer?.cancel();
 
+    // Clear existing timers
+    final currentDeviationTimers = Map<String, Timer>.from(state['deviationTimers'] as Map);
+    currentDeviationTimers.forEach((_, timer) => timer.cancel());
+
+    // Update state in a single operation
     state = {
-      ...state,
       'isMonitoring': true,
       'currentRideIndex': 0,
+      'lastDistances': <String, Map<String, dynamic>>{},
+      'deviationTimers': <String, Timer>{},
+      'monitoredRides': <String>{},
+      'lastEmergencyTimes': state['lastEmergencyTimes'] ?? <String, DateTime>{},
     };
 
+    // Start new monitoring timer
     _monitoringTimer = Timer.periodic(
       distanceCheckInterval,
           (_) => _checkRouteDeviation(rides, currentPosition),
@@ -165,13 +172,18 @@ class RouteMonitoringService extends StateNotifier<Map<String, dynamic>> {
   }
 
   Future<void> _reportRouteDeviation(String rideId, String passengerId) async {
+    if (!mounted) return;
+
     try {
       print('REPORTING EMERGENCY - Ride: $rideId, Passenger: $passengerId');
 
+      // Show dialog first
       if (context != null && mounted) {
-        showEmergencyDialog(context!);
+        // Use microtask to avoid build phase conflicts
+        Future.microtask(() => showEmergencyDialog(context!));
       }
 
+      // Then update Firestore
       await FirebaseFirestore.instance.collection('emergencies').add({
         'pushedBy': passengerId,
         'rideId': rideId,

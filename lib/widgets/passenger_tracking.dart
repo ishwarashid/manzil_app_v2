@@ -51,94 +51,45 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
     }
   }
 
-  Future<void> _showPaymentDialog(BuildContext context, String rideId) async {
-    return showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('Select Payment Method'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(
-                Icons.circle,
-                color: Colors.amber,
-              ),
-              title: const Text('Cash'),
-              onTap: _isPaying
-                  ? null
-                  : () async {
-                      print("hi");
-                      setState(() {
-                        _isPaying = true;
-                      });
+  Future<void> _showPaymentDialog(BuildContext context, Map<String, dynamic> ride) async {
+    final paymentMethod = ride['paymentMethod'] as String? ?? 'cash';
+    final formattedPaymentMethod = paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
 
-                      await _updateRideStatus(rideId, 'paying');
-                      Navigator.of(ctx).pop();
+    // First update the status to paying
+    await _updateRideStatus(ride['id'], 'paying');
 
-                      setState(() {
-                        _isPaying = false;
-                      });
-                    },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.circle,
-                color: Colors.redAccent,
-              ),
-              title: const Text('JazzCash'),
-              onTap: _isPaying
-                  ? null
-                  : () async {
-                      setState(() {
-                        _isPaying = true;
-                      });
-                      await _updateRideStatus(rideId, 'paying');
-                      // Add JazzCash integration here
-                      setState(() {
-                        _isPaying = false;
-                      });
-                      Navigator.of(ctx).pop();
-                    },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.circle,
-                color: Colors.green,
-              ),
-              title: const Text('EasyPaisa'),
-              onTap: _isPaying
-                  ? null
-                  : () async {
-                      setState(() {
-                        _isPaying = true;
-                      });
-                      await _updateRideStatus(rideId, 'paying');
-                      Navigator.of(ctx).pop();
+    // Show alert dialog
+    if (mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext ctx) {
+          // Auto dismiss after 3 seconds
+          Future.delayed(const Duration(seconds: 3), () {
+            if (ctx.mounted) {
+              Navigator.of(ctx).pop();
+            }
+          });
 
-                      // Add EasyPaisa integration here
-                      setState(() {
-                        _isPaying = false;
-                      });
-                    },
+          return AlertDialog(
+            title: const Text('Make Payment'),
+            content: Text(
+              'Please pay Rs. ${ride['calculatedFare']} through $formattedPaymentMethod to your driver.',
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: _isPaying ? null : () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
+          );
+        },
+      );
+    }
   }
 
   Future<void> _handleRideCompletion(Map<String, dynamic> rideData) async {
-    // Show completion alert for 2 seconds
-    // if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (!mounted) return;
+
+    // Store context reference
+    final navigatorContext = context;
+
+    // Show completion snackbar
+    ScaffoldMessenger.of(navigatorContext).showSnackBar(
       const SnackBar(
         content: Text('Ride Completed Successfully!'),
         duration: Duration(seconds: 2),
@@ -146,19 +97,19 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
     );
 
     await Future.delayed(const Duration(seconds: 2));
-    // if (!mounted) return;
+    if (!mounted) return;
 
     // Show rating dialog
     final result = await showDialog<Map<String, dynamic>>(
-      context: context,
+      context: navigatorContext,
       barrierDismissible: false,
       builder: (ctx) => RideRatingDialog(
         driverName: rideData['driverName'],
       ),
     );
 
-    // If user didn't skip rating
-    if (result != null) {
+    // If user rated the ride
+    if (result != null && mounted) {
       try {
         await _ridesService.addRatingAndUpdateDriver(
           rideId: rideData['id'],
@@ -167,10 +118,10 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
         );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(navigatorContext).showSnackBar(
           SnackBar(
             content: Text('Failed to submit rating: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: Theme.of(navigatorContext).colorScheme.error,
           ),
         );
       }
@@ -178,9 +129,9 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
 
     // Navigate to home screen
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
+    Navigator.of(navigatorContext).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const HomeScreen()),
-      (route) => false,
+          (route) => false,
     );
   }
 
@@ -197,7 +148,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
     final userRideStatus =
-        ref.watch(userRideStatusProvider(currentUser['uid']));
+    ref.watch(userRideStatusProvider(currentUser['uid']));
 
     return Scaffold(
       body: userRideStatus.when(
@@ -215,18 +166,28 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
 
             // If there are no completed rides either, go home
             if (completedRides.isEmpty) {
-              Future.microtask(() {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                      (route) => false,
-                );
-              });
+              if (mounted) {
+                Future.microtask(() {
+                  if (mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const HomeScreen()),
+                          (route) => false,
+                    );
+                  }
+                });
+              }
               return const Center(child: CircularProgressIndicator());
             }
 
             // Handle completed ride if exists
             final currentRide = completedRides.first;
-            Future.microtask(() => _handleRideCompletion(currentRide));
+            if (mounted) {
+              Future.microtask(() {
+                if (mounted) {
+                  _handleRideCompletion(currentRide);
+                }
+              });
+            }
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -283,9 +244,9 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                                 context: context,
                                 builder: (context) {
                                   Future.delayed(const Duration(seconds: 2),
-                                      () {
-                                    Navigator.of(context).pop(true);
-                                  });
+                                          () {
+                                        Navigator.of(context).pop(true);
+                                      });
                                   return const AlertDialog(
                                     title: Text(
                                       "Emergency Alert Sent!",
@@ -339,7 +300,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.redAccent,
                             foregroundColor:
-                                Theme.of(context).colorScheme.onPrimary,
+                            Theme.of(context).colorScheme.onPrimary,
                             textStyle: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w500,
@@ -347,7 +308,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                           ),
                           child: _isProcessing
                               ? const CircularProgressIndicator(
-                                  color: Colors.white)
+                              color: Colors.white)
                               : const Text("Cancel Ride"),
                         ),
                       ),
@@ -362,7 +323,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.amber,
                               foregroundColor:
-                                  Theme.of(context).colorScheme.onPrimary,
+                              Theme.of(context).colorScheme.onPrimary,
                               textStyle: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w500,
@@ -379,14 +340,14 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                             onPressed: _isProcessing
                                 ? null
                                 : () async {
-                                    await _showPaymentDialog(
-                                        context, currentRide['id']);
-                                  },
+                              await _showPaymentDialog(
+                                  context, currentRide);
+                            },
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
-                                  const Color.fromARGB(255, 76, 175, 64),
+                              const Color.fromARGB(255, 76, 175, 64),
                               foregroundColor:
-                                  Theme.of(context).colorScheme.onPrimary,
+                              Theme.of(context).colorScheme.onPrimary,
                               textStyle: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w500,
@@ -394,7 +355,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                             ),
                             child: _isProcessing
                                 ? const CircularProgressIndicator(
-                                    color: Colors.white)
+                                color: Colors.white)
                                 : const Text("Complete Ride"),
                           ),
                         ),

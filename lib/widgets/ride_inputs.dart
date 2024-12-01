@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
@@ -113,6 +114,54 @@ class _RideInputsState extends ConsumerState<RideInputs> {
     });
 
     try {
+      // First check if user has any active rides as a passenger
+      final activePassengerRides = await FirebaseFirestore.instance
+          .collection('rides')
+          .where('passengerID', isEqualTo: currentUser['uid'])
+          .where('status', whereIn: ['picked', 'accepted', 'paying'])
+          .get();
+
+      if (activePassengerRides.docs.isNotEmpty) {
+        setState(() {
+          _isProcessing = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("You already have an active ride as a passenger. Please complete or cancel it first."),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Then check if user has any active rides as a driver
+      final activeDriverRides = await FirebaseFirestore.instance
+          .collection('rides')
+          .where('selectedDriverId', isEqualTo: currentUser['uid'])
+          .where('status', whereIn: ['accepted', 'picked', 'paying'])
+          .get();
+
+      if (activeDriverRides.docs.isNotEmpty) {
+        setState(() {
+          _isProcessing = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("You have active rides as a driver. Please complete them before booking a ride."),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
       // Get pickup coordinates - either from booking inputs or current user
       final pickupCoordinates = (bookingInputs['pickupCoordinates'] as List?)?.isNotEmpty == true
           ? bookingInputs['pickupCoordinates']
@@ -121,19 +170,30 @@ class _RideInputsState extends ConsumerState<RideInputs> {
       // Start a batch write
       final batch = FirebaseFirestore.instance.batch();
 
-      // First, cancel all existing pending rides for this user
-      final existingRidesQuery = await FirebaseFirestore.instance
+      // Cancel any pending rides
+      final pendingRidesQuery = await FirebaseFirestore.instance
           .collection('rides')
           .where('passengerID', isEqualTo: currentUser['uid'])
-          .where('status', whereIn: ['pending', 'accepted'])
+          .where('status', isEqualTo: 'pending')
           .get();
 
-      for (var doc in existingRidesQuery.docs) {
-        batch.update(doc.reference, {
-          'status': 'cancelled',
-          'cancelledAt': Timestamp.now(),
-          'cancelReason': 'New ride requested',
-        });
+      if (pendingRidesQuery.docs.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Cancelling your previous pending ride requests..."),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+
+        for (var doc in pendingRidesQuery.docs) {
+          batch.update(doc.reference, {
+            'status': 'cancelled',
+            'cancelledAt': Timestamp.now(),
+            'cancelReason': 'New ride requested',
+          });
+        }
       }
 
       // Create the new ride
@@ -141,12 +201,14 @@ class _RideInputsState extends ConsumerState<RideInputs> {
       batch.set(newRideRef, {
         'passengerName': '${currentUser['first_name']} ${currentUser['last_name']}',
         'passengerID': currentUser['uid'],
+        'passengerNumber': currentUser['phone_number'],
         'pickupLocation': bookingInputs['pickup'],
         'pickupCoordinates': pickupCoordinates,
         'destination': bookingInputs['destination'],
         'destinationCoordinates': bookingInputs['destinationCoordinates'],
         'seats': bookingInputs['seats'],
         'offeredFare': bookingInputs['fare'],
+        'paymentMethod': bookingInputs['paymentMethod'],
         'isPrivate': bookingInputs['private'],
         'status': 'pending',
         'createdAt': Timestamp.now(),
@@ -154,6 +216,16 @@ class _RideInputsState extends ConsumerState<RideInputs> {
       });
 
       await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Ride requested successfully!"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
 
       ref.read(bookingInputsProvider.notifier).resetBookingInputs();
       setState(() {
@@ -169,8 +241,10 @@ class _RideInputsState extends ConsumerState<RideInputs> {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Something went wrong. Please try again later."),
+          SnackBar(
+            content: Text("Error: ${e.toString()}"),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -203,7 +277,7 @@ class _RideInputsState extends ConsumerState<RideInputs> {
           Expanded(
             child: Column(
               children: [
-                InkWell(
+                GestureDetector(
                   onTap: _openPickupModalOverlay,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,

@@ -1,10 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:manzil_app_v2/services/chat/chat_services.dart';
 import 'package:manzil_app_v2/widgets/message_bubble.dart';
 
 class MessageList extends StatelessWidget {
   MessageList({super.key, required this.currentUser, required this.receiverId});
-  final Map<String, dynamic> currentUser; // User data from the provider
+  final Map<String, dynamic> currentUser;
   final String receiverId;
   final ChatService _chatService = ChatService();
 
@@ -14,10 +15,28 @@ class MessageList extends StatelessWidget {
       stream: _chatService.getMessages(currentUser['uid'], receiverId),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Center(
-            child: Text("Something went wrong! Please try again later."),
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Something went wrong!\nPlease try again later.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
           );
         }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(),
@@ -25,8 +44,25 @@ class MessageList extends StatelessWidget {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Text('No messages found.'),
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.chat_bubble_outline,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "No messages yet.\nStart the conversation!",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
@@ -41,8 +77,7 @@ class MessageList extends StatelessWidget {
           reverse: true,
           itemCount: loadedMessages.length,
           itemBuilder: (ctx, index) {
-            final chatMessage =
-            loadedMessages[index].data() as Map<String, dynamic>;
+            final chatMessage = loadedMessages[index].data() as Map<String, dynamic>;
             final nextChatMessage = index + 1 < loadedMessages.length
                 ? loadedMessages[index + 1].data() as Map<String, dynamic>
                 : null;
@@ -52,10 +87,14 @@ class MessageList extends StatelessWidget {
             nextChatMessage != null ? nextChatMessage['senderId'] : null;
             final nextUserIsSame = nextMessageUserId == currentMessageUserId;
 
+            // Convert Firestore timestamp to DateTime
+            final timestamp = (chatMessage['timestamp'] as Timestamp).toDate();
+
             if (nextUserIsSame) {
               return MessageBubble.next(
                 message: chatMessage['message'],
                 isMe: currentUser['uid'] == currentMessageUserId,
+                timestamp: timestamp,
               );
             } else {
               return MessageBubble.first(
@@ -64,6 +103,7 @@ class MessageList extends StatelessWidget {
                     : chatMessage['sender_name'],
                 message: chatMessage['message'],
                 isMe: currentUser['uid'] == currentMessageUserId,
+                timestamp: timestamp,
               );
             }
           },

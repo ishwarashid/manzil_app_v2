@@ -27,6 +27,37 @@ class ChatList extends ConsumerWidget {
           );
         }
 
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.chat_bubble_outline,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "No chats yet",
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onBackground,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Your conversations will appear here",
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        print(snapshot.data);
+
         return ListView(
           children: snapshot.data!
               .map<Widget>((userData) => ChatListItem(userData: userData))
@@ -34,6 +65,5 @@ class ChatList extends ConsumerWidget {
         );
       },
     );
-    ;
   }
 }

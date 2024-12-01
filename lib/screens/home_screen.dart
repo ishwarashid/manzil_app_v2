@@ -2,7 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:manzil_app_v2/main.dart';
+import 'package:manzil_app_v2/providers/booking_inputs_provider.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
+import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
 import 'package:manzil_app_v2/screens/booking.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
 import 'package:manzil_app_v2/screens/find_drivers.dart';
@@ -82,16 +85,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         if (querySnapshot.docs.isNotEmpty) {
           final doc = querySnapshot.docs.first;
-
           final userData = doc.data() as Map<String, dynamic>;
-
           userData['uid'] = doc.id;
+          // print(userData['isBanned'] == true);
+          // Check if user is banned
+          if (userData['isBanned'] == true) {
+            // Use addPostFrameCallback to ensure the widget tree is built
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
 
+              // Show ban message
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Your account has been banned. Please contact support.'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+
+              // Clear user data
+              final box = GetStorage();
+              box.erase();
+              ref.read(currentUserProvider.notifier).clearUser();
+              ref.read(ridesFilterProvider.notifier).clearFilter();
+              ref.read(bookingInputsProvider.notifier).resetBookingInputs();
+
+              // Navigate to MyApp
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const MyApp()),
+                    (route) => false,
+              );
+            });
+            return;
+          }
+
+          // If not banned, update user data
           ref.read(currentUserProvider.notifier).setUser(userData);
         }
       } catch (e) {
-        // Handle error
         print("Error fetching user data: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error fetching user data: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -134,17 +174,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
-          if (_isLoadingLocation)
+          _isLoadingLocation ?
             const Center(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.only(right: 60),
                 child: SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
-            ),
+            )
+          :
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: ElevatedButton.icon(

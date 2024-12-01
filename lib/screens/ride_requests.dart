@@ -43,8 +43,9 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   Future<void> _initiateChat(Map<String, dynamic> request) async {
     final currentUser = ref.read(currentUserProvider);
     final receiverId = request["passengerID"];
+    final receiverNumber = request["passengerNumber"];
 
-    await _chatService.createChatRoom(currentUser, receiverId as String);
+    // await _chatService.createChatRoom(currentUser, receiverId as String);
 
     if (!mounted) return;
 
@@ -62,6 +63,7 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
           currentUser: currentUser,
           fullName: request["passengerName"] as String,
           receiverId: receiverId,
+          receiverNumber: receiverNumber,
         ),
       ),
     );
@@ -324,24 +326,25 @@ class RideRequestCard extends StatelessWidget {
       timeAgoStr = '${timeAgo.inDays}d ago';
     }
 
+    final isPrivate = request['isPrivate'] as bool? ?? false;
+    print(isPrivate);
+    final paymentMethod = request['paymentMethod'] as String? ?? 'cash';
+    final formattedPaymentMethod = paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
+
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
       margin: const EdgeInsets.symmetric(vertical: 10),
       child: Padding(
-        padding: const EdgeInsets.only(
-          left: 10,
-          right: 10,
-          bottom: 15,
-          top: 5,
-        ),
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header row with name, time, and chat
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
                       Text(
                         request["passengerName"] as String,
@@ -351,6 +354,14 @@ class RideRequestCard extends StatelessWidget {
                           color: Color.fromRGBO(30, 60, 87, 1),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '•',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.5),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Text(
                         timeAgoStr,
                         style: Theme.of(context).textTheme.bodySmall,
@@ -364,93 +375,176 @@ class RideRequestCard extends StatelessWidget {
                     color: Color.fromARGB(255, 255, 170, 42),
                   ),
                   onPressed: onChat,
-                )
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  color: Color.fromARGB(255, 255, 107, 74),
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    request["pickupLocation"] as String,
-                    style: const TextStyle(fontSize: 14),
-                    softWrap: true,
-                    overflow: TextOverflow.ellipsis,
-                  ),
                 ),
               ],
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: Row(
+
+            const SizedBox(height: 16),
+
+            // Location details
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(
-                        Icons.navigation,
-                        color: Color.fromARGB(255, 255, 170, 42),
+                        Icons.location_on_outlined,
+                        color: Color.fromARGB(255, 255, 107, 74),
+                        size: 20,
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          request["destination"] as String,
+                          request["pickupLocation"] as String,
                           style: const TextStyle(fontSize: 14),
-                          softWrap: true,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.navigation,
+                        color: Color.fromARGB(255, 255, 170, 42),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          request["destination"] as String,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Ride details row
+            Row(
+              children: [
+                // Ride type badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isPrivate
+                        ? const Color.fromARGB(255, 255, 170, 42)
+                        : const Color.fromARGB(255, 255, 107, 74),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isPrivate ? 'Private' : 'Public',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 8),
+
+                const SizedBox(width: 12),
+
+                // Seats badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${request["seats"]} seats',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+
+                const Spacer(),
+
+                // Payment info
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       'Rs. ${request["offeredFare"]}',
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: Color.fromRGBO(30, 60, 87, 1),
                       ),
                     ),
-                    Text(
-                      '${request["seats"]} seats',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color.fromRGBO(30, 60, 87, 0.7),
-                      ),
+                    Row(
+                      children: [
+                        Icon(
+                          paymentMethod == 'cash'
+                              ? Icons.money
+                              : paymentMethod == 'jazzcash'
+                              ? Icons.phone_android
+                              : Icons.account_balance_wallet,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          formattedPaymentMethod,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: isProcessing ? null : onAccept,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  child: isProcessing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
-                            ),
-                          ),
-                        )
-                      : const Text("Accept"),
-                ),
               ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Accept button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isProcessing ? null : onAccept,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                child: isProcessing
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+                    : const Text("Accept"),
+              ),
             ),
           ],
         ),

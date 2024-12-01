@@ -4,12 +4,13 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
   BookingInputsNotifier()
       : super({
     "pickup": '',
-    "pickupCoordinates": <double>[], // Changed from List<int>
+    "pickupCoordinates": <double>[],
     "destination": '',
-    "destinationCoordinates": <double>[], // Changed from List<int>
+    "destinationCoordinates": <double>[],
     "seats": 0,
     "fare": 0,
-    "private": false
+    "private": false,
+    "paymentMethod": 'cash',
   });
 
   void setPickup(String pickup) {
@@ -61,20 +62,30 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
     };
   }
 
+  // Added new method for payment
+  void setPaymentMethod(String method) {
+    state = {
+      ...state,
+      "paymentMethod": method,
+    };
+  }
+
   bool areAllFieldsFilled() {
     print(state["pickup"]);
     print(state["destination"]);
     print(state["seats"]);
-    print( state["fare"]);
+    print(state["fare"]);
     print(state["pickupCoordinates"]);
     print(state["destinationCoordinates"]);
+    print(state["paymentMethod"]);
 
     return state["pickup"] != '' &&
         state["destination"] != '' &&
         state["seats"] != 0 &&
         state["fare"] != 0 &&
         (state["pickupCoordinates"] as List).isNotEmpty &&
-        (state["destinationCoordinates"] as List).isNotEmpty;
+        (state["destinationCoordinates"] as List).isNotEmpty &&
+        state["paymentMethod"] != '';
   }
 
   void resetBookingInputs() {
@@ -86,6 +97,7 @@ class BookingInputsNotifier extends StateNotifier<Map<String, Object>> {
       "seats": 0,
       "fare": 0,
       "private": false,
+      "paymentMethod": 'cash',
     };
   }
 }

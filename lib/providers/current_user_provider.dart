@@ -11,40 +11,51 @@ class CurrentUserNotifier extends StateNotifier<Map<String, dynamic>> {
     "first_name": '',
     "last_name": '',
     "phone_number": '',
+    "isBanned": false,
     "coordinates": [],
     "location_text": ''
   });
 
-  // for getting permission
+  DateTime? _lastLocationUpdate;
+  static const _locationUpdateThreshold = Duration(minutes: 1);
+
   Future<bool> requestLocationPermission() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    // Test if location services are enabled.
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return false;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
         return false;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return false;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      print('Error requesting location permission: $e');
       return false;
     }
-
-    return true;
   }
 
   Future<void> updateLocation() async {
+    // Check if we should update location based on threshold
+    if (_lastLocationUpdate != null &&
+        DateTime.now().difference(_lastLocationUpdate!) < _locationUpdateThreshold) {
+      return;
+    }
+
     try {
       final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 5),
       );
 
       // Update coordinates
@@ -53,38 +64,51 @@ class CurrentUserNotifier extends StateNotifier<Map<String, dynamic>> {
         "coordinates": [position.latitude, position.longitude]
       };
 
-      // Get location text using OpenStreetMap
+      // Get location text
       final locationText = await _getAddressFromCoordinates(
-          position.latitude,
-          position.longitude
+        position.latitude,
+        position.longitude,
       );
 
       state = {
         ...state,
         "location_text": locationText
       };
+
+      _lastLocationUpdate = DateTime.now();
     } catch (e) {
       print('Error updating location: $e');
       throw e;
     }
   }
 
-  // for getting text location text location
   Future<String> _getAddressFromCoordinates(double lat, double lon) async {
-    final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?format=json&accept-language=en-US&lat=$lat&lon=$lon&zoom=18&addressdetails=1'
-    );
+    try {
+      final url = Uri.parse(
+          'https://nominatim.openstreetmap.org/reverse?format=json&accept-language=en-US&lat=$lat&lon=$lon&zoom=18&addressdetails=1'
+      );
 
-    final response = await http.get(
+      final response = await http.get(
         url,
-        headers: {'Accept': 'application/json'}
-    );
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Manzil App',
+        },
+      ).timeout(const Duration(seconds: 5));
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['display_name'];
-    } else {
-      throw Exception('Failed to get address');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['display_name'];
+      } else {
+        throw Exception('Failed to get address: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error getting address: $e');
+      // Return last known location text if available, otherwise throw
+      if (state['location_text'].isNotEmpty) {
+        return state['location_text'];
+      }
+      throw Exception('Failed to get address: $e');
     }
   }
 
@@ -95,6 +119,13 @@ class CurrentUserNotifier extends StateNotifier<Map<String, dynamic>> {
     };
   }
 
+  void updateField(String field, dynamic value) {
+    state = {
+      ...state,
+      field: value
+    };
+  }
+
   void clearUser() {
     state = {
       "uid": '',
@@ -102,9 +133,11 @@ class CurrentUserNotifier extends StateNotifier<Map<String, dynamic>> {
       "first_name": '',
       "last_name": '',
       "phone_number": '',
+      "isBanned": false,
       "coordinates": [],
       "location_text": ''
     };
+    _lastLocationUpdate = null;
   }
 }
 

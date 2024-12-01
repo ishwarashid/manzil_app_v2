@@ -12,21 +12,24 @@ class InputFare extends ConsumerStatefulWidget {
 
 class _InputFareState extends ConsumerState<InputFare> {
   final _formKey = GlobalKey<FormState>();
-
   var _enteredFare = 0;
-  final _minFare = 150; // will be dynamically calculated
+  final _minFare = 50;
+  String _selectedPaymentMethod = 'cash';
 
   @override
   void initState() {
     super.initState();
     final bookingInputs = ref.read(bookingInputsProvider);
     _enteredFare = bookingInputs["fare"] as int? ?? 0;
+    _selectedPaymentMethod = bookingInputs["paymentMethod"] as String? ?? 'cash';
   }
 
   void _saveFare() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      ref.read(bookingInputsProvider.notifier).setFare(_enteredFare);
+      final notifier = ref.read(bookingInputsProvider.notifier);
+      notifier.setFare(_enteredFare);
+      notifier.setPaymentMethod(_selectedPaymentMethod);
       Navigator.pop(context);
     }
   }
@@ -56,6 +59,7 @@ class _InputFareState extends ConsumerState<InputFare> {
             Form(
               key: _formKey,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextFormField(
                     keyboardType: TextInputType.number,
@@ -74,23 +78,19 @@ class _InputFareState extends ConsumerState<InputFare> {
                       ),
                       focusedBorder: const OutlineInputBorder(
                         borderSide: BorderSide(
-                            color: Color.fromARGB(255, 255, 170, 42),
-                            width: 2),
+                            color: Color.fromARGB(255, 255, 170, 42), width: 2),
                       ),
-                      enabledBorder:const  OutlineInputBorder(
+                      enabledBorder: const OutlineInputBorder(
                         borderSide: BorderSide(
-                            color: Color.fromARGB(160, 255, 255, 255),
-                            width: 2),
+                            color: Color.fromARGB(160, 255, 255, 255), width: 2),
                       ),
                       errorBorder: OutlineInputBorder(
                         borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.error,
-                            width: 2),
+                            color: Theme.of(context).colorScheme.error, width: 2),
                       ),
                       focusedErrorBorder: OutlineInputBorder(
                         borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.error,
-                            width: 2),
+                            color: Theme.of(context).colorScheme.error, width: 2),
                       ),
                       contentPadding: const EdgeInsets.fromLTRB(12, 18, 12, 18),
                     ),
@@ -112,22 +112,67 @@ class _InputFareState extends ConsumerState<InputFare> {
                     },
                   ),
                   const SizedBox(height: 20),
-                  Row(
+                  const Text(
+                    'Payment Method',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Color.fromARGB(200, 255, 255, 255),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Column(
                     children: [
-                      const Icon(
-                        Icons.money,
-                        color: Color.fromARGB(255, 255, 170, 42),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Cash Only',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary,
+                      RadioListTile(
+                        title: Text(
+                          'Cash',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                         ),
+                        value: 'cash',
+                        groupValue: _selectedPaymentMethod,
+                        activeColor: const Color.fromARGB(255, 255, 170, 42),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedPaymentMethod = value.toString();
+                          });
+                        },
+                      ),
+                      RadioListTile(
+                        title: Text(
+                          'JazzCash',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        ),
+                        value: 'jazzcash',
+                        groupValue: _selectedPaymentMethod,
+                        activeColor: const Color.fromARGB(255, 255, 170, 42),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedPaymentMethod = value.toString();
+                          });
+                        },
+                      ),
+                      RadioListTile(
+                        title: Text(
+                          'EasyPaisa',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        ),
+                        value: 'easypaisa',
+                        groupValue: _selectedPaymentMethod,
+                        activeColor: const Color.fromARGB(255, 255, 170, 42),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedPaymentMethod = value.toString();
+                          });
+                        },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     height: 50,

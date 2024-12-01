@@ -19,17 +19,43 @@ class PassengerTrackingMap extends ConsumerStatefulWidget {
 }
 
 class _PassengerTrackingMapState extends ConsumerState<PassengerTrackingMap> {
-  final mapController = MapController();
+  MapController? mapController;  // Make nullable
   LatLng? currentLocation;
   StreamSubscription<Position>? _locationStreamSubscription;
-  bool _isLoading = true;  // Add loading state
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _initializeLocation();
+    // Initialize controller after frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() {
+        mapController = MapController();
+      });
+      _initializeLocation();
+    });
   }
 
+  void _startLocationStream() {
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10,
+    );
+
+    _locationStreamSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen(
+          (Position position) {
+        if (mounted && mapController != null) {
+          setState(() {
+            currentLocation = LatLng(position.latitude, position.longitude);
+            mapController?.move(currentLocation!, mapController!.camera.zoom);
+          });
+        }
+      },
+      onError: (e) => print('Location stream error: $e'),
+    );
+  }
   Future<void> _initializeLocation() async {
     try {
       final permission = await Geolocator.checkPermission();
@@ -61,24 +87,6 @@ class _PassengerTrackingMapState extends ConsumerState<PassengerTrackingMap> {
     }
   }
 
-  void _startLocationStream() {
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 10,
-    );
-
-    _locationStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen(
-          (Position position) {
-        setState(() {
-          currentLocation = LatLng(position.latitude, position.longitude);
-          mapController.move(currentLocation!, mapController.camera.zoom);
-        });
-      },
-      onError: (e) => print('Location stream error: $e'),
-    );
-  }
 
   @override
   void dispose() {
