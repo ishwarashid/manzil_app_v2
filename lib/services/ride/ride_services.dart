@@ -167,6 +167,7 @@ class RidesService {
           .set({
         'driverName': "${driverInfo['first_name']} ${driverInfo['last_name']}",
         'driverNumber': driverInfo['phone_number'],
+        'driverRatings': driverInfo['overallRating'] ?? 0,
         'driverLocation': driverInfo['location_text'],
         'driverCoordinates': driverCoordinates,
         'distanceFromPassenger': distanceFromPassenger,

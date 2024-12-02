@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
+import 'package:manzil_app_v2/screens/chats_screen.dart';
+import 'package:manzil_app_v2/screens/find_drivers.dart';
 import 'package:manzil_app_v2/screens/home_screen.dart';
 import 'package:manzil_app_v2/widgets/driver_tracking_map.dart';
+import 'package:manzil_app_v2/widgets/main_drawer.dart';
 
 class DriverTracking extends ConsumerStatefulWidget {
   const DriverTracking({
@@ -87,7 +90,8 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
     print("Showing payment dialog for ride: ${ride['id']}");
 
     final paymentMethod = ride['paymentMethod'] as String? ?? 'cash';
-    final formattedPaymentMethod = paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
+    final formattedPaymentMethod =
+        paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
 
     // Store ScaffoldMessenger reference
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -95,8 +99,10 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
     Future<void> reportFraud() async {
       try {
         // Create a local copy of all operations
-        final Future<void> statusUpdate = _updateRideStatus(ride['id'], 'completed');
-        final Future<void> fraudReport = FirebaseFirestore.instance.collection('frauds').add({
+        final Future<void> statusUpdate =
+            _updateRideStatus(ride['id'], 'completed');
+        final Future<void> fraudReport =
+            FirebaseFirestore.instance.collection('frauds').add({
           'fraudUserId': ride['passengerID'],
           'rideId': ride['id'],
           'reason': 'payment',
@@ -196,12 +202,74 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
     );
   }
 
+  Future<void> _cancelRide(String rideId) async {
+    if (_isProcessing) return;
+
+    try {
+      setState(() {
+        _isProcessing = true;
+        _processingRideId = rideId;
+      });
+
+      await _updateRideStatus(rideId, 'cancelled');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ride cancelled successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel ride: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _processingRideId = null;
+        });
+      }
+    }
+  }
+
+  void _setScreen(String identifier, {bool? isDriver}) async {
+    Navigator.of(context).pop();
+    if (identifier == 'chats') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (ctx) => const ChatsScreen(),
+        ),
+      );
+    } else if (identifier == 'foundDrivers') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (ctx) => const FindDrivers(),
+        ),
+      );
+    } else if (identifier == 'home') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
 
     return Scaffold(
+      drawer: MainDrawer(
+        onSelectScreen: _setScreen,
+      ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: getRidesStream(currentUser['uid']),
         builder: (context, snapshot) {
@@ -226,16 +294,29 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                 .compareTo(b['distanceFromPassenger'] as num));
 
           if (pendingRides.isEmpty) {
-            // Use microtask for navigation
-            Future.microtask(() {
-              if (!mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-              );
+            // Single navigation call with PostFrameCallback
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                  (route) => false,
+                );
+              }
             });
-            return const Center(child: CircularProgressIndicator());
+            return const SizedBox();
           }
+
+          // if (pendingRides.isEmpty) {
+          //   // Use microtask for navigation
+          //   Future.microtask(() {
+          //     if (!mounted) return;
+          //     Navigator.of(context).pushAndRemoveUntil(
+          //       MaterialPageRoute(builder: (context) => const HomeScreen()),
+          //           (route) => false,
+          //     );
+          //   });
+          //   return const Center(child: CircularProgressIndicator());
+          // }
 
           // Add this check before accessing first element
           if (!mounted || pendingRides.isEmpty) {
@@ -265,7 +346,26 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                 ),
               ),
               Positioned(
-                bottom: 220,
+                top: 40,
+                left: 16,
+                child: Builder(
+                  builder: (context) => CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.menu,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                      onPressed: () {
+                        Scaffold.of(context).openDrawer();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 260,
                 left: 20,
                 child: CircleAvatar(
                   radius: 24,
@@ -287,10 +387,9 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                             barrierDismissible: false,
                             context: context,
                             builder: (context) {
-                              Future.delayed(const Duration(seconds: 2),
-                                      () {
-                                    Navigator.of(context).pop(true);
-                                  });
+                              Future.delayed(const Duration(seconds: 2), () {
+                                Navigator.of(context).pop(true);
+                              });
                               return const AlertDialog(
                                 title: Text(
                                   "Emergency Alert Sent!",
@@ -346,6 +445,39 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                             .bodyLarge!
                             .copyWith(color: Colors.white),
                       ),
+                      if (rideStatus == 'accepted' ||
+                          rideStatus == 'picked') ...[
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _isProcessing
+                                ? null
+                                : () => _cancelRide(currentRide['id']),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.onPrimary,
+                              textStyle: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            child: _isProcessing &&
+                                    _processingRideId == currentRide['id']
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text("Cancel Ride"),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

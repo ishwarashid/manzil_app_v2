@@ -179,22 +179,28 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
                   ],
                 ),
               ),
-              InkWell(
-                onTap: _showDestinationInputDialog,
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: const ImageIcon(
-                    ResizeImage(
-                      AssetImage('assets/icons/filter_rides_icon.png'),
-                      width: 48,
-                      height: 48,
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color.fromRGBO(30, 60, 87, 1).withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _showDestinationInputDialog,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      child: const ImageIcon(
+                        ResizeImage(
+                          AssetImage('assets/icons/filter_rides_icon.png'),
+                          width: 48,
+                          height: 48,
+                        ),
+                        size: 22,
+                        color: Color.fromRGBO(30, 60, 87, 1),
+                      ),
                     ),
-                    size: 20,
-                    color: Color.fromRGBO(30, 60, 87, 1),
                   ),
                 ),
               ),

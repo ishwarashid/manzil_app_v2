@@ -33,21 +33,38 @@ class DriverPassengerService {
         .doc(rideId)
         .collection('acceptedBy')
         .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
+        .asyncMap((snapshot) async {
+      final List<Map<String, dynamic>> acceptedDrivers = [];
+
+      for (final doc in snapshot.docs) {
         final data = doc.data();
-        return {
-          'driverId': doc.id,
-          'driverName': data['driverName'],
-          'driverNumber': doc['driverNumber'],
-          'driverLocation': data['driverLocation'],
-          'driverCoordinates': data['driverCoordinates'],
-          'distanceFromPassenger': data['distanceFromPassenger'],
-          'driverDistanceFromDestination': data['distanceFromPassenger'],
-          'calculatedFare': data['calculatedFare'],
-          'timestamp': data['timestamp'],
-        };
-      }).toList();
+        final driverId = doc.id;
+
+        // Check if driver has any active rides as a passenger
+        final activeRidesQuery = await _firestore
+            .collection('rides')
+            .where('passengerID', isEqualTo: driverId)
+            .where('status', whereNotIn: ['cancelled', 'completed'])
+            .get();
+
+        // Only include driver if they don't have any active rides as a passenger
+        if (activeRidesQuery.docs.isEmpty) {
+          acceptedDrivers.add({
+            'driverId': driverId,
+            'driverName': data['driverName'],
+            'driverNumber': data['driverNumber'],
+            'driverRatings': data['driverRatings'] ?? 0,
+            'driverLocation': data['driverLocation'],
+            'driverCoordinates': data['driverCoordinates'],
+            'distanceFromPassenger': data['distanceFromPassenger'],
+            'driverDistanceFromDestination': data['distanceFromPassenger'],
+            'calculatedFare': data['calculatedFare'],
+            'timestamp': data['timestamp'],
+          });
+        }
+      }
+
+      return acceptedDrivers;
     });
   }
 
@@ -89,6 +106,7 @@ class DriverPassengerService {
         'status': 'accepted',
         'selectedDriverId': driverInfo['driverId'],
         'driverNumber': driverInfo['driverNumber'],
+        'driverRatings': driverInfo['driverRatings'] ?? 0,
         'driverName': driverInfo['driverName'],
         'passengerNumber': ['passengerNumber'],
         'driverLocation': driverInfo['driverLocation'],

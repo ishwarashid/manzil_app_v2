@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/providers/user_ride_providers.dart';
+import 'package:manzil_app_v2/screens/chats_screen.dart';
+import 'package:manzil_app_v2/screens/find_drivers.dart';
 import 'package:manzil_app_v2/screens/home_screen.dart';
 import 'package:manzil_app_v2/services/ride/ride_services.dart';
+import 'package:manzil_app_v2/widgets/main_drawer.dart';
 import 'package:manzil_app_v2/widgets/passenger_tracking_map.dart';
 import 'package:manzil_app_v2/widgets/ride_rating_dialog.dart';
 
@@ -40,18 +43,52 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
   }
 
   Future<void> _cancelRide(String rideId) async {
+    if (!mounted) return;
+
     try {
       setState(() => _isProcessing = true);
       await _updateRideStatus(rideId, 'cancelled');
+
+      // Store context before navigation
+      final navigatorContext = context;
+
+      // Show success message
+      ScaffoldMessenger.of(navigatorContext).showSnackBar(
+        const SnackBar(
+          content: Text('Ride cancelled successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Reset processing state before navigation
       if (mounted) {
-        Navigator.of(context).pop(); // Go back to home
+        setState(() => _isProcessing = false);
       }
-    } finally {
-      setState(() => _isProcessing = false);
+
+      // Navigate after resetting state
+      if (mounted) {
+        Navigator.of(navigatorContext).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel ride: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
   Future<void> _showPaymentDialog(BuildContext context, Map<String, dynamic> ride) async {
+    print(ride['status']);
+    print("payment dialog");
     final paymentMethod = ride['paymentMethod'] as String? ?? 'cash';
     final formattedPaymentMethod = paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
 
@@ -144,6 +181,28 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
     }
   }
 
+  void _setScreen(String identifier, {bool? isDriver}) async {
+    Navigator.of(context).pop();
+    if (identifier == 'chats') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (ctx) => const ChatsScreen(),
+        ),
+      );
+    } else if (identifier == 'foundDrivers') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (ctx) => const FindDrivers(),
+        ),
+      );
+    } else if (identifier == 'home') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
@@ -151,6 +210,9 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
     ref.watch(userRideStatusProvider(currentUser['uid']));
 
     return Scaffold(
+      drawer: MainDrawer(
+        onSelectScreen: _setScreen,
+      ),
       body: userRideStatus.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
@@ -164,19 +226,17 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
             final completedRides = status.activeRidesWithCompleted
                 .where((ride) => ride['status'] == 'completed');
 
-            // If there are no completed rides either, go home
             if (completedRides.isEmpty) {
-              if (mounted) {
-                Future.microtask(() {
-                  if (mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => const HomeScreen()),
-                          (route) => false,
-                    );
-                  }
-                });
-              }
-              return const Center(child: CircularProgressIndicator());
+              // Use a single navigation call
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
+                        (route) => false,
+                  );
+                }
+              });
+              return const SizedBox(); // Return empty widget instead of loading
             }
 
             // Handle completed ride if exists
@@ -275,6 +335,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                 ),
 
               // Bottom Buttons
+              // Bottom Buttons
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Container(
@@ -290,40 +351,63 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isProcessing
-                              ? null
-                              : () => _cancelRide(currentRide['id']),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent,
-                            foregroundColor:
-                            Theme.of(context).colorScheme.onPrimary,
-                            textStyle: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          child: _isProcessing
-                              ? const CircularProgressIndicator(
-                              color: Colors.white)
-                              : const Text("Cancel Ride"),
+                      if (rideStatus == 'paying') ...[
+                        const Icon(
+                          Icons.payments_outlined,
+                          color: Colors.white,
+                          size: 40,
                         ),
-                      ),
-                      const SizedBox(height: 30),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Payment in Progress',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Please make the payment to complete your ride',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.8),
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      if (rideStatus == 'accepted' || rideStatus == 'picked') ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _isProcessing
+                                ? null
+                                : () => _cancelRide(currentRide['id']),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                              textStyle: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            child: _isProcessing
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : const Text("Cancel Ride"),
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                      ],
                       if (rideStatus == 'accepted')
                         SizedBox(
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: () =>
-                                _updateRideStatus(currentRide['id'], 'picked'),
+                            onPressed: () => _updateRideStatus(currentRide['id'], 'picked'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.amber,
-                              foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                               textStyle: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w500,
@@ -340,22 +424,18 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                             onPressed: _isProcessing
                                 ? null
                                 : () async {
-                              await _showPaymentDialog(
-                                  context, currentRide);
+                              await _showPaymentDialog(context, currentRide);
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                              const Color.fromARGB(255, 76, 175, 64),
-                              foregroundColor:
-                              Theme.of(context).colorScheme.onPrimary,
+                              backgroundColor: const Color.fromARGB(255, 76, 175, 64),
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                               textStyle: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             child: _isProcessing
-                                ? const CircularProgressIndicator(
-                                color: Colors.white)
+                                ? const CircularProgressIndicator(color: Colors.white)
                                 : const Text("Complete Ride"),
                           ),
                         ),

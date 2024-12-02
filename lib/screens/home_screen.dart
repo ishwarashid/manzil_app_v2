@@ -10,6 +10,7 @@ import 'package:manzil_app_v2/screens/booking.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
 import 'package:manzil_app_v2/screens/find_drivers.dart';
 import 'package:manzil_app_v2/screens/ride_requests.dart';
+import 'package:manzil_app_v2/screens/tracking.dart';
 import 'package:manzil_app_v2/screens/user_activity.dart';
 import 'package:manzil_app_v2/widgets/main_drawer.dart';
 
@@ -136,7 +137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _setScreen(String identifier) async {
+  void _setScreen(String identifier, {bool? isDriver}) async {
     Navigator.of(context).pop();
     if (identifier == 'chats') {
       Navigator.of(context).push(
@@ -148,6 +149,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (ctx) => const FindDrivers(),
+        ),
+      );
+    } else if(identifier == 'tracking') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (ctx) => TrackingScreen(isDriver!),
         ),
       );
     }

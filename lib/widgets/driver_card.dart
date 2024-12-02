@@ -17,13 +17,8 @@ class DriverCard extends ConsumerWidget {
   });
 
   String _getEstimatedTime(double distanceInMeters) {
-    // Average speed: 30 km/h = 8.33 m/s
     const averageSpeedInMetersPerSecond = 8.33;
-
-    // Calculate time in seconds
     final timeInSeconds = distanceInMeters / averageSpeedInMetersPerSecond;
-
-    // Convert to minutes
     final minutes = timeInSeconds / 60;
 
     if (minutes < 1) {
@@ -38,6 +33,54 @@ class DriverCard extends ConsumerWidget {
     }
   }
 
+  Widget _buildRatingBadge() {
+    if (driverInfo['driverRatings'] == 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.grey.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          'New Driver',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      );
+    }
+
+    final rating = (driverInfo['driverRatings'] as num).toDouble();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(255, 255, 170, 42).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.star_rounded,
+            size: 16,
+            color: Color.fromARGB(255, 255, 170, 42),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            rating.toStringAsFixed(1),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color.fromARGB(255, 255, 170, 42),
+                // color: Colors.grey[600]
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.read(currentUserProvider);
@@ -45,40 +88,59 @@ class DriverCard extends ConsumerWidget {
     final estimatedTime = _getEstimatedTime(distance);
 
     return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       color: Theme.of(context).colorScheme.primaryContainer,
-      margin: const EdgeInsets.symmetric(vertical: 10),
       child: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  child: const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        driverInfo["driverName"] as String,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Color.fromARGB(255, 45, 45, 45),
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            driverInfo["driverName"] as String,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              // color: Color.fromRGBO(30, 60, 87, 1),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildRatingBadge(),
+                        ],
                       ),
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(
                             Icons.access_time,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.secondary,
+                            size: 14,
+                            color: Colors.grey[600],
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 4),
                           Text(
                             estimatedTime,
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.secondary,
+                              fontSize: 13,
+                              color: Colors.grey[600],
                             ),
                           ),
                         ],
@@ -86,21 +148,23 @@ class DriverCard extends ConsumerWidget {
                     ],
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Rs. ${driverInfo["calculatedFare"]}",
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    // color: Color.fromRGBO(30, 60, 87, 1),
+                  ),
+                ),
                 Row(
                   children: [
-                    Text(
-                      "Rs. ${driverInfo["calculatedFare"]}",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color.fromARGB(255, 45, 45, 45),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.message,
-                        color: Color.fromARGB(255, 255, 170, 42),
-                      ),
+                    OutlinedButton.icon(
                       onPressed: () {
                         Navigator.push(
                           context,
@@ -120,38 +184,48 @@ class DriverCard extends ConsumerWidget {
                           ),
                         );
                       },
+                      icon: const Icon(
+                        Icons.message_outlined,
+                        color: Color.fromARGB(255, 255, 170, 42),
+                        size: 18,
+                      ),
+                      label: const Text("Message"),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color.fromARGB(255, 255, 170, 42),
+                        side: const BorderSide(
+                          color:Color.fromARGB(255, 255, 170, 42),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: isAccepting ? null : onAccept,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                      ),
+                      child: isAccepting
+                          ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                          : const Text(
+                        "Book",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                ElevatedButton(
-                  onPressed: isAccepting ? null : onAccept,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  child: isAccepting
-                      ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                      : const Text("Book"),
-                ),
-              ],
-            )
           ],
         ),
       ),

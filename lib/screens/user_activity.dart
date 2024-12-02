@@ -5,8 +5,55 @@ import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:manzil_app_v2/providers/user_ride_providers.dart';
 
-class UserActivityScreen extends ConsumerWidget {
+class UserActivityScreen extends ConsumerStatefulWidget {
   const UserActivityScreen({super.key});
+
+  @override
+  ConsumerState<UserActivityScreen> createState() => _UserActivityScreenState();
+}
+
+class _UserActivityScreenState extends ConsumerState<UserActivityScreen> {
+  String? _processingRideId;
+
+  Future<void> _updateRideStatus(String rideId, String newStatus) async {
+    print(newStatus);
+    final firestore = FirebaseFirestore.instance;
+    await firestore.collection('rides').doc(rideId).update({
+      'status': newStatus,
+      'updatedAt': Timestamp.now(),
+    });
+  }
+
+  Future<void> _cancelRide(String rideId) async {
+    if (_processingRideId != null) return;
+
+    try {
+      setState(() => _processingRideId = rideId);
+      await _updateRideStatus(rideId, 'cancelled');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ride cancelled successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel ride: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _processingRideId = null);
+      }
+    }
+  }
 
   String _formatTimestamp(Timestamp timestamp) {
     final date = timestamp.toDate();
@@ -22,22 +69,26 @@ class UserActivityScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildRideCard(
-      BuildContext context, Map<String, dynamic> ride, bool isDriver) {
+  Widget _buildRideCard(BuildContext context, Map<String, dynamic> ride, bool isDriver) {
     final status = ride['status'] as String;
-    final isAccepted = status == 'accepted' ||
-        status == 'picked' ||
-        ride['status'] == 'paying';
+    final isAccepted = status == 'accepted' || status == 'picked' || status == 'paying';
+    final isPending = status == 'pending';
+    final rideId = ride['id'] as String;
+    final isProcessing = _processingRideId == rideId;
+    final paymentMethod = ride['paymentMethod'] as String? ?? 'cash';
+    final formattedPaymentMethod = paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
 
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
       margin: const EdgeInsets.symmetric(vertical: 10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header with timestamp and status
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
@@ -46,96 +97,175 @@ class UserActivityScreen extends ConsumerWidget {
                         : "Ride booked ${_formatTimestamp(ride['createdAt'])}",
                     style: const TextStyle(
                       fontSize: 18,
-                      color: Color.fromRGBO(30, 60, 87, 1),
                       fontWeight: FontWeight.w600,
+                      color: Color.fromRGBO(30, 60, 87, 1),
                     ),
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: isAccepted
                         ? Colors.green.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
+                        : const Color.fromARGB(255, 255, 170, 42).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     status.capitalize(),
                     style: TextStyle(
-                      color: isAccepted ? Colors.green : Colors.orange,
+                      fontSize: 12,
+                      color: isAccepted
+                          ? Colors.green
+                          : const Color.fromARGB(255, 255, 170, 42),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
               ],
             ),
+
             const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  color: Color.fromARGB(255, 255, 107, 74),
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    ride["pickupLocation"] as String,
-                    style: const TextStyle(fontSize: 16),
+
+            // Location details box
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        color: Color.fromARGB(255, 255, 107, 74),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          ride["pickupLocation"] as String,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                const Icon(
-                  Icons.navigation,
-                  color: Color.fromARGB(255, 255, 170, 42),
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    ride["destination"] as String,
-                    style: const TextStyle(fontSize: 16),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.navigation,
+                        color: Color.fromARGB(255, 255, 170, 42),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          ride["destination"] as String,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
+
+            const SizedBox(height: 16),
+
+            // Driver/Passenger info and payment
             Row(
               children: [
                 Icon(
                   isDriver ? Icons.person : Icons.drive_eta_rounded,
-                  color: isAccepted
-                      ? const Color.fromRGBO(30, 60, 87, 1)
-                      : Theme.of(context).colorScheme.secondary,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     isDriver
                         ? (ride['passengerName'] ?? 'Unknown Passenger')
                         : (ride['selectedDriverName'] ?? 'Yet to be confirmed'),
                     style: TextStyle(
-                      fontSize: 16,
-                      color: isAccepted
-                          ? const Color.fromRGBO(30, 60, 87, 1)
-                          : Theme.of(context).colorScheme.secondary,
-                      fontWeight: isAccepted ? FontWeight.w600 : null,
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                Text(
-                  'Rs. ${ride['finalFare'] ?? ride['offeredFare']}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color.fromRGBO(30, 60, 87, 1),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Rs. ${ride['finalFare'] ?? ride['offeredFare']}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Color.fromRGBO(30, 60, 87, 1),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          paymentMethod == 'cash'
+                              ? Icons.money
+                              : paymentMethod == 'jazzcash'
+                              ? Icons.phone_android
+                              : Icons.account_balance_wallet,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          formattedPaymentMethod,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
+
+            // Cancel button for pending passenger rides
+            if (!isDriver && isPending) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: isProcessing ? null : () => _cancelRide(rideId),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: isProcessing
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                      : const Text(
+                    "Cancel Ride",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -143,7 +273,7 @@ class UserActivityScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
     final userId = currentUser['uid'] as String;
     final userRideStatus = ref.watch(userRideStatusProvider(userId));
@@ -153,22 +283,33 @@ class UserActivityScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Your Current Activity",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Color.fromRGBO(30, 60, 87, 1),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            width: 165,
-            height: 4,
-            decoration: BoxDecoration(
-              color: const Color.fromRGBO(30, 60, 87, 1),
-              borderRadius: BorderRadius.circular(5),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Your Current Activity",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Color.fromRGBO(30, 60, 87, 1),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 165,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color.fromRGBO(30, 60, 87, 1),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           Expanded(
@@ -192,10 +333,9 @@ class UserActivityScreen extends ConsumerWidget {
                         const SizedBox(height: 16),
                         Text(
                           'No Activity Yet',
-                          style:
-                              Theme.of(context).textTheme.titleLarge!.copyWith(
-                                    color: const Color.fromRGBO(30, 60, 87, 1),
-                                  ),
+                          style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                            color: const Color.fromRGBO(30, 60, 87, 1),
+                          ),
                         ),
                       ],
                     ),
@@ -219,7 +359,6 @@ class UserActivityScreen extends ConsumerWidget {
   }
 }
 
-// Extension to capitalize first letter
 extension StringExtension on String {
   String capitalize() {
     return "${this[0].toUpperCase()}${substring(1)}";

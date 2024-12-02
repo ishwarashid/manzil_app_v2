@@ -11,14 +11,16 @@ import 'package:manzil_app_v2/screens/tracking.dart';
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key, required this.onSelectScreen});
 
-  final void Function(String identifier) onSelectScreen;
+  // final void Function(String identifier, bool? isDriver) onSelectScreen;
+  final void Function(String identifier, {bool? isDriver}) onSelectScreen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final box = GetStorage();
     final currentUser = ref.watch(currentUserProvider);
-    final userRideStatus =
-        ref.watch(userRideStatusProvider(currentUser['uid']));
+    final userRideStatus = ref.watch(userRideStatusProvider(currentUser['uid']));
+    final hasRating = currentUser.containsKey('overallRating');
+    final rating = hasRating ? (currentUser['overallRating'] as num).toDouble() : null;
 
     return Drawer(
       child: Column(
@@ -26,40 +28,72 @@ class MainDrawer extends ConsumerWidget {
         children: [
           Column(
             children: [
-              DrawerHeader(
-                decoration:
-                    BoxDecoration(color: Theme.of(context).colorScheme.primary),
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 20, right: 20),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.person,
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        size: 42,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          (currentUser['first_name'] as String).isEmpty
-                              ? "Unknown"
-                              : currentUser['first_name'] as String,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            fontSize: 24,
-                          ),
-                          softWrap: true,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+                color: Theme.of(context).colorScheme.primary,
+                child: Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color.fromARGB(255, 255, 170, 42),
+                          width: 2,
                         ),
-                      )
-                    ],
-                  ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Theme.of(context).colorScheme.onPrimary.withOpacity(0.1),
+                        child: Icon(
+                          Icons.person,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          size: 30,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            (currentUser['first_name'] as String).isEmpty
+                                ? "Unknown"
+                                : currentUser['first_name'] as String,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (hasRating) const SizedBox(height: 4),
+                          if (hasRating)
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.star_rounded,
+                                  color: Color.fromARGB(255, 255, 170, 42),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  rating!.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onPrimary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 0, 0),
+                padding: const EdgeInsets.fromLTRB(20, 20, 0, 0),
                 child: ListTile(
                   title: Text(
                     "Home",
@@ -149,14 +183,17 @@ class MainDrawer extends ConsumerWidget {
                           size: 30,
                         ),
                         onTap: () {
-                          // onSelectScreen('tracking');
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (ctx) => TrackingScreen(status.isDriver),
-                            ),
-                          );
+                          onSelectScreen('tracking', isDriver: status.isDriver);
                         },
+                        // onTap: () {
+                        //   // onSelectScreen('tracking');
+                        //   // Navigator.push(
+                        //   //   context,
+                        //   //   MaterialPageRoute(
+                        //   //     builder: (ctx) => TrackingScreen(status.isDriver),
+                        //   //   ),
+                        //   // );
+                        // },
                       ),
                     );
                   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
 import 'package:manzil_app_v2/screens/find_drivers.dart';
+import 'package:manzil_app_v2/screens/tracking.dart';
 import 'package:manzil_app_v2/widgets/main_drawer.dart';
 import 'package:manzil_app_v2/widgets/main_map.dart';
 import 'package:manzil_app_v2/widgets/ride_inputs.dart';
@@ -23,7 +24,7 @@ class _BookingState extends State<Booking> {
     );
   }
 
-  void _setScreen(String identifier) async {
+  void _setScreen(String identifier, {bool? isDriver}) async {
     Navigator.of(context).pop();
     if (identifier == 'home') {
       Navigator.of(context).pop();
@@ -39,13 +40,22 @@ class _BookingState extends State<Booking> {
           builder: (ctx) => const FindDrivers(),
         ),
       );
+    } else if (identifier == 'tracking') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (ctx) => TrackingScreen(isDriver!),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: MainDrawer(onSelectScreen: _setScreen,),
+      drawer: MainDrawer(
+        onSelectScreen: _setScreen,
+      ),
       body: SafeArea(
         child: SlidingUpPanel(
           panel: Center(

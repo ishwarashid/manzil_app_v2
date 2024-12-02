@@ -11,6 +11,7 @@ class CurrentUserNotifier extends StateNotifier<Map<String, dynamic>> {
     "first_name": '',
     "last_name": '',
     "phone_number": '',
+    "overallRating": 0,
     "isBanned": false,
     "coordinates": [],
     "location_text": ''
@@ -133,6 +134,7 @@ class CurrentUserNotifier extends StateNotifier<Map<String, dynamic>> {
       "first_name": '',
       "last_name": '',
       "phone_number": '',
+      "overallRating": 0,
       "isBanned": false,
       "coordinates": [],
       "location_text": ''
