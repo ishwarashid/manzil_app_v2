@@ -56,7 +56,7 @@ class CurrentUserNotifier extends StateNotifier<Map<String, dynamic>> {
     try {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 5),
+        timeLimit: const Duration(seconds: 10),
       );
 
       // Update coordinates

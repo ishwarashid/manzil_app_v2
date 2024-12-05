@@ -76,7 +76,8 @@ class _FindDriversState extends ConsumerState<FindDrivers> {
             }
 
             if (rideSnapshot.hasError) {
-              return Center(child: Text('Error: ${rideSnapshot.error}'));
+              // return Center(child: Text('Error: ${rideSnapshot.error}'));
+              return const Center(child: Text('Something went wrong. Please try again later.'));
             }
 
             final currentRide = rideSnapshot.data;

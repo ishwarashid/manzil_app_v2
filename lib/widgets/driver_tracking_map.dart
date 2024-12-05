@@ -102,28 +102,24 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
           desiredAccuracy: LocationAccuracy.high
       );
 
-      if (!mounted) return;
-
       setState(() {
         currentLocation = LatLng(position.latitude, position.longitude);
         mapController.move(currentLocation!, 15);
       });
 
-      // Use microtask for route monitoring
+      // Start monitoring only once during initialization
       if (widget.rides.isNotEmpty) {
-        Future.microtask(() {
-          if (!mounted) return;
-          ref.read(routeMonitoringProvider.notifier).startMonitoring(
-            widget.rides,
-            position,
-          );
-        });
+        ref.read(routeMonitoringProvider.notifier).startMonitoring(
+          widget.rides,
+          position,
+        );
       }
     } catch (e) {
       print('Error getting initial location: $e');
     }
   }
 
+  // Update this in DriverTrackingMap
   void _startLocationStream() {
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
@@ -134,21 +130,16 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
       locationSettings: locationSettings,
     ).listen(
           (Position position) {
-        print('New position from stream: ${position.latitude}, ${position.longitude}');
         setState(() {
           currentLocation = LatLng(position.latitude, position.longitude);
         });
 
-        // Update route monitoring after state is set
+        // Change this to startMonitoring
         if (widget.rides.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              ref.read(routeMonitoringProvider.notifier).startMonitoring(
-                widget.rides,
-                position,
-              );
-            }
-          });
+          ref.read(routeMonitoringProvider.notifier).startMonitoring(
+            widget.rides,
+            position,
+          );
         }
       },
       onError: (e) => print('Location stream error: $e'),
@@ -157,7 +148,7 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
 
   void _startDatabaseUpdates() {
     _databaseUpdateTimer = Timer.periodic(
-      const Duration(minutes: 2),
+      const Duration(seconds: 10), // 2 mins after testing
           (_) => _updateDriverLocationInDatabase(),
     );
   }
@@ -178,13 +169,11 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
       final batch = FirebaseFirestore.instance.batch();
 
       for (final ride in acceptedRides) {
-        final acceptedByRef = FirebaseFirestore.instance
+        final rideRef = FirebaseFirestore.instance
             .collection('rides')
-            .doc(ride['id'])
-            .collection('acceptedBy')
-            .doc(widget.driverId);
+            .doc(ride['id']);
 
-        batch.update(acceptedByRef, {
+        batch.update(rideRef, {
           'driverLocation': locationText,
           'driverCoordinates': [currentLocation!.latitude, currentLocation!.longitude],
           'updatedAt': Timestamp.now(),
@@ -192,6 +181,7 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
       }
 
       await batch.commit();
+      print('Successfully updated driver location for ${acceptedRides.length} rides');
     } catch (e) {
       print('Error updating location in database: $e');
     }

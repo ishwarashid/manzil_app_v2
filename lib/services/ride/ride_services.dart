@@ -95,8 +95,49 @@ class RidesService {
     }
   }
 
+  Future<Map<String, dynamic>> validateDriverDocuments(String driverId) async {
+    final driverDoc = await _firestore.collection('users').doc(driverId).get();
+    final driverData = driverDoc.data() as Map<String, dynamic>;
+
+    // Check if documents exist
+    if (!driverData.containsKey('cnic') || !driverData.containsKey('drivingLicense')) {
+      return {
+        'isValid': false,
+        'needsSetup': true,
+        'message': 'Please complete your driver setup first'
+      };
+    }
+
+    // Check expiry dates
+    final cnicExpiry = (driverData['cnicExpiry'] as Timestamp).toDate();
+    final licenseExpiry = (driverData['licenseExpiry'] as Timestamp).toDate();
+    final now = DateTime.now();
+
+    if (cnicExpiry.isBefore(now)) {
+      return {
+        'isValid': false,
+        'needsSetup': false,
+        'message': 'Your CNIC has expired. Please update your documents.'
+      };
+    }
+
+    if (licenseExpiry.isBefore(now)) {
+      return {
+        'isValid': false,
+        'needsSetup': false,
+        'message': 'Your driving license has expired. Please update your documents.'
+      };
+    }
+
+    return {'isValid': true};
+  }
+
   Future<void> acceptRide(String rideId, Map<String, dynamic> driverInfo) async {
     try {
+      final validation = await validateDriverDocuments(driverInfo['uid']);
+      if (!validation['isValid']) {
+        throw Exception(validation['message']);
+      }
       // First get the ride details
       final rideDoc = await _firestore.collection('rides').doc(rideId).get();
       final controlsDoc = await _firestore.collection('controls').get();
@@ -179,6 +220,7 @@ class RidesService {
       print('Driver added to subcollection successfully');
     } catch (e) {
       print('Failed to add driver: $e');
+      // throw Exception(e.toString());
       throw Exception(e.toString());
     }
   }

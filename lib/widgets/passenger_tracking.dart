@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/providers/user_ride_providers.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
@@ -19,10 +22,91 @@ class PassengerTracking extends ConsumerStatefulWidget {
 }
 
 class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
+  double? _distanceToDestination;
+  Timer? _distanceUpdateTimer;
   bool _isProcessing = false;
   bool _isPaying = false;
 
   final _ridesService = RidesService();
+
+  @override
+  void initState() {
+    super.initState();
+    _startDistanceUpdates();
+  }
+
+  void _startDistanceUpdates() {
+    // Initial distance calculation
+    _updateDistance();
+
+    // Set up timer for periodic updates
+    _distanceUpdateTimer = Timer.periodic(
+      const Duration(minutes: 2),
+          (_) => _updateDistance(),
+    );
+  }
+
+  Future<void> _updateDistance() async {
+    try {
+      // Get current location
+      final Position currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      if (!mounted) return;
+
+      final userRideStatus = ref.read(userRideStatusProvider(ref.read(currentUserProvider)['uid']));
+
+      userRideStatus.whenData((status) {
+        final pendingRides = status.activeRidesWithCompleted
+            .where((ride) => ride['status'] != 'completed')
+            .toList();
+
+        if (pendingRides.isNotEmpty) {
+          final currentRide = pendingRides.first;
+          final destinationCoordinates = currentRide['destinationCoordinates'] as List;
+
+          // Calculate distance
+          final distance = Geolocator.distanceBetween(
+            currentPosition.latitude,
+            currentPosition.longitude,
+            destinationCoordinates[0],
+            destinationCoordinates[1],
+          );
+
+          // Convert to kilometers and update state
+          setState(() {
+            _distanceToDestination = distance / 1000; // Convert meters to kilometers
+          });
+        }
+      });
+    } catch (e) {
+      print('Error updating distance: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _distanceUpdateTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _deleteChatRoom(String driverId, String passengerId) async {
+    try {
+      List<String> ids = [driverId, passengerId];
+      ids.sort();
+      String chatRoomId = ids.join("_");
+
+      await FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(chatRoomId)
+          .delete();
+
+      print('Chat room deleted: $chatRoomId');
+    } catch (e) {
+      print('Error deleting chat room: $e');
+    }
+  }
 
   Future<void> _sendEmergencyAlert(String rideId, String userId) async {
     final firestore = FirebaseFirestore.instance;
@@ -47,7 +131,24 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
 
     try {
       setState(() => _isProcessing = true);
-      await _updateRideStatus(rideId, 'cancelled');
+
+      // Get ride details for driver ID
+      final rideDoc = await FirebaseFirestore.instance
+          .collection('rides')
+          .doc(rideId)
+          .get();
+      final rideData = rideDoc.data();
+
+      if (rideData != null) {
+        // Update ride status and delete chat room
+        await Future.wait([
+          _updateRideStatus(rideId, 'cancelled'),
+          _deleteChatRoom(
+            rideData['selectedDriverId'],
+            rideData['passengerID'],
+          ),
+        ]);
+      }
 
       // Store context before navigation
       final navigatorContext = context;
@@ -172,14 +273,14 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
     );
   }
 
-  Future<void> _completeRide(String rideId) async {
-    try {
-      setState(() => _isProcessing = true);
-      await _updateRideStatus(rideId, 'completed');
-    } finally {
-      setState(() => _isProcessing = false);
-    }
-  }
+  // Future<void> _completeRide(String rideId) async {
+  //   try {
+  //     setState(() => _isProcessing = true);
+  //     await _updateRideStatus(rideId, 'completed');
+  //   } finally {
+  //     setState(() => _isProcessing = false);
+  //   }
+  // }
 
   void _setScreen(String identifier, {bool? isDriver}) async {
     Navigator.of(context).pop();
@@ -336,6 +437,37 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
 
               // Bottom Buttons
               // Bottom Buttons
+              if (rideStatus == 'picked' && _distanceToDestination != null)
+                Positioned(
+                  bottom: 220,
+                  right: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_distanceToDestination!.toStringAsFixed(1)} km',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Container(

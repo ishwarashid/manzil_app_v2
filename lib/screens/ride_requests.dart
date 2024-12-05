@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
+import 'package:manzil_app_v2/screens/setup_driver_screen.dart';
 import 'package:manzil_app_v2/screens/user_chat_screen.dart';
 import 'package:manzil_app_v2/services/chat/chat_services.dart';
 import 'package:manzil_app_v2/services/ride/ride_services.dart';
@@ -18,8 +19,7 @@ class RideRequestsScreen extends ConsumerStatefulWidget {
 
 class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   final _ridesService = RidesService();
-  final _chatService = ChatService();
-  bool _isProcessing = false;
+  String? _processingRideId;
 
   void _showDestinationInputDialog() {
     showDialog(
@@ -31,14 +31,14 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   @override
   void initState() {
     super.initState();
-    final enteredDestination = ref.read(ridesFilterProvider)["destination"] as String ?? '';
+    final enteredDestination =
+        ref.read(ridesFilterProvider)["destination"] as String ?? '';
     if (enteredDestination.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showDestinationInputDialog();
       });
     }
   }
-
 
   Future<void> _initiateChat(Map<String, dynamic> request) async {
     final currentUser = ref.read(currentUserProvider);
@@ -101,43 +101,64 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   // }
 
   Future<void> _acceptRide(String rideId) async {
-    if (_isProcessing) return;
+    if (_processingRideId != null) return;
 
     try {
       setState(() {
-        _isProcessing = true;
+        _processingRideId = rideId; // Store the ID of the ride being processed
       });
 
       final currentUser = ref.read(currentUserProvider);
 
-      await _ridesService.acceptRide(rideId, currentUser);
+      try {
+        await _ridesService.acceptRide(rideId, currentUser);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ride request accepted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ride request accepted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
         String errorMessage = e.toString();
         if (errorMessage.contains('Exception: ')) {
           errorMessage = errorMessage.replaceAll('Exception: ', '');
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        if (errorMessage.contains('RangeError')){
+          errorMessage = "Something went wrong. Please check your internet connection.";
+        }
+
+        // Check if needs setup
+        if (errorMessage == 'Please complete your driver setup first') {
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const SetupDriverScreen(),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            print(errorMessage);
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          }
+        }
+        rethrow;
       }
     } finally {
       if (mounted) {
         setState(() {
-          _isProcessing = false;
+          _processingRideId = null;
         });
       }
     }
@@ -146,7 +167,8 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    final enteredDestination = ref.watch(ridesFilterProvider)["destination"] as String? ?? '';
+    final enteredDestination =
+        ref.watch(ridesFilterProvider)["destination"] as String? ?? '';
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -217,14 +239,26 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
               child: StreamBuilder<List<Map<String, dynamic>>>(
                 stream: _ridesService.getRides(currentUser['uid']),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  // if (snapshot.connectionState == ConnectionState.waiting) {
+                  //   return const Center(child: CircularProgressIndicator()); // when i press on accept i start to see this progress bar
+                  // }
+                  // if (snapshot.connectionState == ConnectionState.waiting && _processingRideId == null) {
+                  //   return const Center(child: CircularProgressIndicator());
+                  // }
+                  if (!snapshot.hasData && _processingRideId == null) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
                   if (snapshot.hasError) {
-                    return Center(
+                    // return Center(
+                    //   child: Text(
+                    //     'Error: ${snapshot.error}',
+                    //     textAlign: TextAlign.center,
+                    //   ),
+                    // );
+                    return const Center(
                       child: Text(
-                        'Error: ${snapshot.error}',
+                        'Something went wrong. Please try again later.',
                         textAlign: TextAlign.center,
                       ),
                     );
@@ -253,7 +287,8 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
                       onAccept: () =>
                           _acceptRide(filteredRequests[index]['id']),
                       onChat: () => _initiateChat(filteredRequests[index]),
-                      isProcessing: _isProcessing,
+                      isProcessing: _processingRideId ==
+                          filteredRequests[index]['id'], // Compare IDs
                     ),
                   );
                 },
@@ -277,16 +312,16 @@ class EmptyStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (identifier == 'setDes' ) {
+    if (identifier == 'setDes') {
       return Padding(
-        padding: const EdgeInsets.only( top: 240),
+        padding: const EdgeInsets.only(top: 240),
         child: Center(
           child: Text(
             message,
             style: Theme.of(context).textTheme.titleLarge!.copyWith(
-              color: const Color.fromRGBO(30, 60, 87, 1),
-              fontWeight: FontWeight.w500,
-            ),
+                  color: const Color.fromRGBO(30, 60, 87, 1),
+                  fontWeight: FontWeight.w500,
+                ),
             textAlign: TextAlign.center,
           ),
         ),
@@ -335,7 +370,8 @@ class RideRequestCard extends StatelessWidget {
     final isPrivate = request['isPrivate'] as bool? ?? false;
     print(isPrivate);
     final paymentMethod = request['paymentMethod'] as String? ?? 'cash';
-    final formattedPaymentMethod = paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
+    final formattedPaymentMethod =
+        paymentMethod[0].toUpperCase() + paymentMethod.substring(1);
 
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
@@ -364,7 +400,10 @@ class RideRequestCard extends StatelessWidget {
                       Text(
                         '•',
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimaryContainer.withOpacity(0.5),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onPrimaryContainer
+                              .withOpacity(0.5),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -471,7 +510,8 @@ class RideRequestCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    color:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -504,8 +544,8 @@ class RideRequestCard extends StatelessWidget {
                           paymentMethod == 'cash'
                               ? Icons.money
                               : paymentMethod == 'jazzcash'
-                              ? Icons.phone_android
-                              : Icons.account_balance_wallet,
+                                  ? Icons.phone_android
+                                  : Icons.account_balance_wallet,
                           size: 14,
                           color: Theme.of(context).colorScheme.primary,
                         ),
@@ -543,12 +583,13 @@ class RideRequestCard extends StatelessWidget {
                 ),
                 child: isProcessing
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
                     : const Text("Accept"),
               ),
             ),

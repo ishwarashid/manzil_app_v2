@@ -22,36 +22,30 @@ class RouteMonitoringService extends StateNotifier<Map<String, dynamic>> {
   }
 
   Timer? _monitoringTimer;
-  static const deviationThreshold = Duration(seconds: 20); // 10 mins
-  static const distanceCheckInterval = Duration(seconds: 10); // 2 mins
+  static const deviationThreshold = Duration(seconds: 5); // 10 mins after testing
+  static const distanceCheckInterval = Duration(seconds: 2); // 2 mins after testing
   static const deviationBuffer = 50.0;
-  static const emergencyCooldown = Duration(seconds: 10); // 5 mins
+  static const emergencyCooldown = Duration(seconds: 5); // 5 mins after testing
 
   void startMonitoring(List<Map<String, dynamic>> rides, Position currentPosition) {
-    print('Starting route monitoring with ${rides.length} rides');
-
-    // Cancel existing timer before starting new one
-    _monitoringTimer?.cancel();
-
-    // Clear existing timers
+    // Instead of resetting everything, just update necessary fields
     final currentDeviationTimers = Map<String, Timer>.from(state['deviationTimers'] as Map);
     currentDeviationTimers.forEach((_, timer) => timer.cancel());
 
-    // Update state in a single operation
     state = {
+      ...state, // Keep existing state
       'isMonitoring': true,
-      'currentRideIndex': 0,
-      'lastDistances': <String, Map<String, dynamic>>{},
       'deviationTimers': <String, Timer>{},
-      'monitoredRides': <String>{},
-      'lastEmergencyTimes': state['lastEmergencyTimes'] ?? <String, DateTime>{},
     };
 
-    // Start new monitoring timer
+    _monitoringTimer?.cancel();
     _monitoringTimer = Timer.periodic(
       distanceCheckInterval,
-          (_) => _checkRouteDeviation(rides, currentPosition),
+          (_) => checkRouteDeviation(rides, currentPosition),
     );
+
+    // Perform initial deviation check
+    checkRouteDeviation(rides, currentPosition);
   }
 
   void stopMonitoring() {
@@ -69,7 +63,7 @@ class RouteMonitoringService extends StateNotifier<Map<String, dynamic>> {
     };
   }
 
-  Future<void> _checkRouteDeviation(
+  Future<void> checkRouteDeviation(
       List<Map<String, dynamic>> rides,
       Position currentPosition
       ) async {
@@ -177,13 +171,12 @@ class RouteMonitoringService extends StateNotifier<Map<String, dynamic>> {
     try {
       print('REPORTING EMERGENCY - Ride: $rideId, Passenger: $passengerId');
 
-      // Show dialog first
+      // First show the dialog immediately
       if (context != null && mounted) {
-        // Use microtask to avoid build phase conflicts
-        Future.microtask(() => showEmergencyDialog(context!));
+        showEmergencyDialog(context!);
       }
 
-      // Then update Firestore
+      // Then update Firestore in the background
       await FirebaseFirestore.instance.collection('emergencies').add({
         'pushedBy': passengerId,
         'rideId': rideId,

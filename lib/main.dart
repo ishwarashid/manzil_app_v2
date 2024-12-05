@@ -34,6 +34,12 @@ final theme = ThemeData(
     seedColor: const Color.fromARGB(255, 52, 59, 113),
   ),
   textTheme: GoogleFonts.latoTextTheme(),
+  textSelectionTheme: const TextSelectionThemeData(
+    cursorColor: Color.fromARGB(255, 255, 170, 42),
+    selectionColor: Color.fromARGB(100, 255, 255, 255),
+    selectionHandleColor:
+    Color.fromARGB(255, 255, 170, 42),
+  ),
 );
 
 void main() async {

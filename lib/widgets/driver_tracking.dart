@@ -211,7 +211,23 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
         _processingRideId = rideId;
       });
 
-      await _updateRideStatus(rideId, 'cancelled');
+      // Get ride details for passenger ID
+      final rideDoc = await FirebaseFirestore.instance
+          .collection('rides')
+          .doc(rideId)
+          .get();
+      final rideData = rideDoc.data();
+
+      if (rideData != null) {
+        // Update ride status and delete chat room
+        await Future.wait([
+          _updateRideStatus(rideId, 'cancelled'),
+          _deleteChatRoom(
+            rideData['selectedDriverId'],
+            rideData['passengerID'],
+          ),
+        ]);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
