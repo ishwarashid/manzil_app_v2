@@ -1,6 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
+import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -8,7 +11,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import 'package:manzil_app_v2/services/route/route_monitoring_service.dart';
 
 class DriverTrackingMap extends ConsumerStatefulWidget {
@@ -30,18 +32,32 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
   LatLng? currentLocation;
   StreamSubscription<Position>? _locationStreamSubscription;
   Timer? _databaseUpdateTimer;
+  late bool _navigationMode;
+  late int _pointerCount;
+  late AlignOnUpdate _alignPositionOnUpdate;
+  late AlignOnUpdate _alignDirectionOnUpdate;
+  late final StreamController<double?> _alignPositionStreamController;
+  late final StreamController<void> _alignDirectionStreamController;
 
   @override
   void initState() {
     super.initState();
     ref.read(routeMonitoringProvider.notifier).setContext(context);
     _checkAndRequestPermissions();
+    _navigationMode = false;
+    _pointerCount = 0;
+    _alignPositionOnUpdate = AlignOnUpdate.never;
+    _alignDirectionOnUpdate = AlignOnUpdate.never;
+    _alignPositionStreamController = StreamController<double?>();
+    _alignDirectionStreamController = StreamController<void>();
   }
 
   @override
   void dispose() {
     _locationStreamSubscription?.cancel();
     _databaseUpdateTimer?.cancel();
+    _alignPositionStreamController.close();
+    _alignDirectionStreamController.close();
     super.dispose();
   }
 
@@ -218,6 +234,11 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
       options: MapOptions(
         initialCenter: center,
         initialZoom: 15,
+        minZoom: 0,
+        maxZoom: 19,
+        onPointerDown: _onPointerDown,
+        onPointerUp: _onPointerUp,
+        onPointerCancel: _onPointerUp,
       ),
       children: [
         TileLayer(
@@ -225,31 +246,31 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
           tileProvider: CancellableNetworkTileProvider(),
           userAgentPackageName: 'com.example.manzil_app',
         ),
-        if (currentLocation != null || widget.rides.isNotEmpty)
+        CurrentLocationLayer(
+          focalPoint: const FocalPoint(
+            ratio: Point(0.0, 0.0),
+            offset: Point(0.0, 0.0),
+          ),
+          alignPositionStream: _alignPositionStreamController.stream,
+          alignDirectionStream: _alignDirectionStreamController.stream,
+          alignPositionOnUpdate: _alignPositionOnUpdate,
+          alignDirectionOnUpdate: _alignDirectionOnUpdate,
+          style: LocationMarkerStyle(
+            headingSectorColor: Theme.of(context).primaryColor,
+            marker: DefaultLocationMarker(
+              color: Theme.of(context).primaryColor,
+              child: const Icon(
+                Icons.navigation,
+                color: Colors.white,
+              ),
+            ),
+            markerSize: const Size(40, 40),
+            markerDirection: MarkerDirection.heading,
+          ),
+        ),
+        if (widget.rides.isNotEmpty)
           MarkerLayer(
             markers: [
-              if (currentLocation != null)
-                Marker(
-                  point: currentLocation!,
-                  width: 80,
-                  height: 80,
-                  child: const Column(
-                    children: [
-                      Icon(
-                        Icons.directions_car,
-                        color: Colors.blue,
-                        size: 30,
-                      ),
-                      Text(
-                        'You',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ...widget.rides.expand((ride) {
                 final markers = <Marker>[];
                 print('Processing ride: ${ride['id']}');
@@ -317,8 +338,58 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
               }),
             ],
           ),
+        Positioned(
+          bottom: 260,
+          right: 20,
+          child: FloatingActionButton(
+            backgroundColor: _navigationMode ? Theme.of(context).primaryColor : Colors.grey,
+            foregroundColor: Colors.white,
+            shape: const CircleBorder(),
+            onPressed: () {
+              setState(
+                    () {
+                  _navigationMode = !_navigationMode;
+                  _alignPositionOnUpdate = _navigationMode
+                      ? AlignOnUpdate.always
+                      : AlignOnUpdate.never;
+                  _alignDirectionOnUpdate = _navigationMode
+                      ? AlignOnUpdate.always
+                      : AlignOnUpdate.never;
+                },
+              );
+              if (_navigationMode) {
+                _alignPositionStreamController.add(18);
+                _alignDirectionStreamController.add(null);
+              }
+            },
+            child: const Icon(
+              Icons.navigation_outlined,
+            ),
+          ),
+        ),
       ],
     );
+  }
+
+  void _onPointerDown(e, l) {
+    _pointerCount++;
+    setState(() {
+      _alignPositionOnUpdate = AlignOnUpdate.never;
+      _alignDirectionOnUpdate = AlignOnUpdate.never;
+    });
+  }
+
+  // Enable align position and align direction again when user manipulation
+  // ended.
+  void _onPointerUp(e, l) {
+    if (--_pointerCount == 0 && _navigationMode) {
+      setState(() {
+        _alignPositionOnUpdate = AlignOnUpdate.always;
+        _alignDirectionOnUpdate = AlignOnUpdate.always;
+      });
+      _alignPositionStreamController.add(18);
+      _alignDirectionStreamController.add(null);
+    }
   }
 }
 

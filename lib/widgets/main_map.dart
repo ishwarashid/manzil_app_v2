@@ -1,16 +1,42 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
+import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:manzil_app_v2/providers/booking_inputs_provider.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 
-class MainMap extends ConsumerWidget {
+class MainMap extends ConsumerStatefulWidget {
   const MainMap({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainMap> createState() => _MainMapState();
+}
+
+class _MainMapState extends ConsumerState<MainMap> {
+
+  late AlignOnUpdate _alignPositionOnUpdate;
+  late final StreamController<double?> _alignPositionStreamController;
+
+  @override
+  void initState() {
+    _alignPositionOnUpdate = AlignOnUpdate.always;
+    _alignPositionStreamController = StreamController<double?>();
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _alignPositionStreamController.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
     final bookingInputs = ref.watch(bookingInputsProvider);
 
@@ -57,32 +83,19 @@ class MainMap extends ConsumerWidget {
           tileProvider: CancellableNetworkTileProvider(),
           userAgentPackageName: 'com.example.manzil_app',
         ),
+        CurrentLocationLayer(
+          rotateAnimationCurve: Curves.easeInOut,
+          alignPositionStream: _alignPositionStreamController.stream,
+          alignPositionOnUpdate: _alignPositionOnUpdate,
+          style: LocationMarkerStyle(
+            headingSectorColor: Theme.of(context).primaryColor,
+            marker: DefaultLocationMarker(
+              color: Theme.of(context).primaryColor,
+            ),
+          ),
+        ),
         MarkerLayer(
           markers: [
-            // Current location marker
-            if (currentLocation != null)
-              Marker(
-                point: currentLocation,
-                width: 80,
-                height: 80,
-                child: const Column(
-                  children: [
-                    Icon(
-                      Icons.my_location,
-                      color: Colors.blue,
-                      size: 30,
-                    ),
-                    Text(
-                      'You',
-                      style: TextStyle(
-                        color: Colors.blue,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
             // Pickup location marker (only if different from current location)
             if (pickupLocation != null &&
                 (pickupLocation.latitude != currentLocation.latitude ||
@@ -133,6 +146,29 @@ class MainMap extends ConsumerWidget {
                 ),
               ),
           ],
+        ),
+        Positioned(
+          top: 8,
+          right: 20,
+          width: 42,
+          child: FloatingActionButton(
+            shape: const CircleBorder(),
+            backgroundColor: Theme.of(context).primaryColor,
+            onPressed: () {
+              // Align the location marker to the center of the map widget
+              // on location update until user interact with the map.
+              setState(
+                    () => _alignPositionOnUpdate = AlignOnUpdate.always,
+              );
+              // Align the location marker to the center of the map widget
+              // and zoom the map to level 18.
+              _alignPositionStreamController.add(18);
+            },
+            child: const Icon(
+              Icons.my_location,
+              color: Colors.white,
+            ),
+          ),
         ),
       ],
     );
