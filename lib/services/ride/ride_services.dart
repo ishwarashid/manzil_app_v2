@@ -55,7 +55,7 @@ class RidesService {
       final selectedRidesQuery = await _firestore
           .collection('rides')
           .where('selectedDriverId', isEqualTo: driverId)
-          .where('status', isEqualTo: 'accepted')
+          .where('status', whereIn: ['accepted', 'picked', 'paying'])
           .limit(1)
           .get();
 
@@ -77,7 +77,7 @@ class RidesService {
       final driverRidesQuery = await _firestore
           .collection('rides')
           .where('selectedDriverId', isEqualTo: driverId)
-          .where('status', isEqualTo: 'accepted')
+          .where('status', whereIn: ['accepted', 'picked', 'paying'])
           .get();
 
       // Check if any of these rides are private
@@ -110,19 +110,38 @@ class RidesService {
     final licenseExpiry = (driverData['licenseExpiry'] as Timestamp).toDate();
     final now = DateTime.now();
 
-    if (cnicExpiry.isBefore(now)) {
-      return {
-        'isValid': false,
-        'needsSetup': false,
-        'message': 'Your CNIC has expired. Please update your documents.'
-      };
-    }
+    // if (cnicExpiry.isBefore(now)) {
+    //   return {
+    //     'isValid': false,
+    //     'needsSetup': false,
+    //     'message': 'Your CNIC has expired. Please update your documents.'
+    //   };
+    // }
+    //
+    // if (licenseExpiry.isBefore(now)) {
+    //   return {
+    //     'isValid': false,
+    //     'needsSetup': false,
+    //     'message': 'Your driving license has expired. Please update your documents.'
+    //   };
+    // }
 
-    if (licenseExpiry.isBefore(now)) {
+    bool cnicExpired = cnicExpiry.isBefore(now);
+    bool licenseExpired = licenseExpiry.isBefore(now);
+
+    if (cnicExpired || licenseExpired) {
       return {
         'isValid': false,
         'needsSetup': false,
-        'message': 'Your driving license has expired. Please update your documents.'
+        'cnicExpired': cnicExpired,
+        'licenseExpired': licenseExpired,
+        'currentData': {
+          'cnic': driverData['cnic'],
+          'cnicExpiry': cnicExpiry,
+          'drivingLicense': driverData['drivingLicense'],
+          'licenseExpiry': licenseExpiry,
+        },
+        'message': 'Documents need to be updated'
       };
     }
 
@@ -133,7 +152,7 @@ class RidesService {
     try {
       final validation = await validateDriverDocuments(driverInfo['uid']);
       if (!validation['isValid']) {
-        throw Exception(validation['message']);
+        throw validation;
       }
       // First get the ride details
       final rideDoc = await _firestore.collection('rides').doc(rideId).get();
@@ -216,9 +235,15 @@ class RidesService {
 
       print('Driver added to subcollection successfully');
     } catch (e) {
+      if (e is Map) {
+        print("here");
+        throw e; // If it's our validation object, throw it directly
+      } else {
+        throw Exception(e.toString()); // Only wrap other errors in Exception
+      }
       print('Failed to add driver: $e');
-      // throw Exception(e.toString());
       throw Exception(e.toString());
+      // print(e.toString());
     }
   }
 

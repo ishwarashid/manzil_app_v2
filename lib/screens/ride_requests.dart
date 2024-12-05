@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
+import 'package:manzil_app_v2/screens/ride_location_map.dart';
 import 'package:manzil_app_v2/screens/setup_driver_screen.dart';
+import 'package:manzil_app_v2/screens/update_driver_documents.dart';
 import 'package:manzil_app_v2/screens/user_chat_screen.dart';
 import 'package:manzil_app_v2/services/ride/ride_services.dart';
 import 'package:manzil_app_v2/widgets/destination_alert_dialog.dart';
@@ -122,25 +124,38 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
           );
         }
       } catch (e) {
-        String errorMessage = e.toString();
-        if (errorMessage.contains('Exception: ')) {
-          errorMessage = errorMessage.replaceAll('Exception: ', '');
-        }
-
-        if (errorMessage.contains('RangeError')){
-          errorMessage = "Something went wrong. Please check your internet connection.";
-        }
-
-        // Check if needs setup
-        if (errorMessage == 'Please complete your driver setup first') {
-          if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const SetupDriverScreen(),
-              ),
-            );
+        if (e is Map && e.containsKey('needsSetup')) {
+          print("hii");
+          if (e['needsSetup'] == true) {
+            if (mounted) {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const SetupDriverScreen()),
+              );
+            }
+          } else {
+            // Handle expired documents
+            if (mounted) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => UpdateDriverDocuments(
+                    isCnicExpired: e['cnicExpired'],
+                    isLicenseExpired: e['licenseExpired'],
+                    currentData: e['currentData'],
+                  ),
+                ),
+              );
+            }
           }
         } else {
+          String errorMessage = e.toString();
+          if (errorMessage.contains('Exception: ')) {
+            errorMessage = errorMessage.replaceAll('Exception: ', '');
+          }
+
+          if (errorMessage.contains('RangeError')){
+            errorMessage = "Something went wrong. Please check your internet connection.";
+          }
+
           if (mounted) {
             print(errorMessage);
             ScaffoldMessenger.of(context).clearSnackBars();
@@ -151,8 +166,9 @@ class RideRequestsScreenState extends ConsumerState<RideRequestsScreen> {
               ),
             );
           }
+
         }
-        rethrow;
+        // rethrow;
       }
     } finally {
       if (mounted) {
@@ -432,44 +448,59 @@ class RideRequestCard extends StatelessWidget {
                 color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        color: Color.fromARGB(255, 255, 107, 74),
-                        size: 20,
+              child: GestureDetector(
+                onLongPress: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RideLocationsMap(
+                        pickupCoordinates: request["pickupCoordinates"] as List,
+                        destinationCoordinates: request["destinationCoordinates"] as List,
+                        pickupLocation: request["pickupLocation"] as String,
+                        destination: request["destination"] as String,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          request["pickupLocation"] as String,
-                          style: const TextStyle(fontSize: 14),
+                    ),
+                  );
+                },
+                child: Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: Color.fromARGB(255, 255, 107, 74),
+                          size: 20,
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.navigation,
-                        color: Color.fromARGB(255, 255, 170, 42),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          request["destination"] as String,
-                          style: const TextStyle(fontSize: 14),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            request["pickupLocation"] as String,
+                            style: const TextStyle(fontSize: 14),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.navigation,
+                          color: Color.fromARGB(255, 255, 170, 42),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            request["destination"] as String,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
 

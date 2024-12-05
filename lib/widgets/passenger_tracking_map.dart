@@ -170,13 +170,13 @@ class _PassengerTrackingMapState extends ConsumerState<PassengerTrackingMap> {
                 children: [
                   Icon(
                     Icons.flag,
-                    color: Colors.red,
+                    color: Color.fromARGB(255, 255, 107, 74),
                     size: 30,
                   ),
                   Text(
                     'Destination',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: Color.fromARGB(255, 255, 107, 74),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -186,7 +186,7 @@ class _PassengerTrackingMapState extends ConsumerState<PassengerTrackingMap> {
           ],
         ),
         Positioned(
-          top: 8,
+          top: 30,
           right: 20,
           width: 42,
           child: FloatingActionButton(

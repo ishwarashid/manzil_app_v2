@@ -318,13 +318,13 @@ class _DriverTrackingMapState extends ConsumerState<DriverTrackingMap> {
                         children: [
                           const Icon(
                             Icons.flag,
-                            color: Colors.red,
+                            color: Color.fromARGB(255, 255, 107, 74),
                             size: 30,
                           ),
                           Text(
                             '${ride['passengerName']} Dest.',
                             style: const TextStyle(
-                              color: Colors.red,
+                              color: Color.fromARGB(255, 255, 107, 74),
                               fontWeight: FontWeight.bold,
                             ),
                           ),

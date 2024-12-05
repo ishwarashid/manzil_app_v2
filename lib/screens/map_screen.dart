@@ -205,9 +205,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       point: currentLocation!,
                       width: 80,
                       height: 80,
-                      child: const Icon(
+                      child: Icon(
                         Icons.my_location,
-                        color: Colors.blue,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 30,
                       ),
                     ),
@@ -222,7 +222,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       height: 80,
                       child: const Icon(
                         Icons.location_on,
-                        color: Colors.red,
+                        color: Color.fromARGB(255, 255, 107, 74),
                         size: 40,
                       ),
                     ),

@@ -201,7 +201,7 @@ class _UserActivityScreenState extends ConsumerState<UserActivityScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'Rs. ${ride['finalFare'] ?? ride['offeredFare']}',
+                      'Rs. ${ride['calculatedFare'] ?? ride['offeredFare']}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,

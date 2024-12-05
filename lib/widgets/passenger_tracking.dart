@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:manzil_app_v2/main.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/providers/user_ride_providers.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
@@ -24,8 +25,19 @@ class PassengerTracking extends ConsumerStatefulWidget {
 class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
   double? _distanceToDestination;
   Timer? _distanceUpdateTimer;
-  bool _isProcessing = false;
-  bool _isPaying = false;
+  bool _isCancelling = false;
+  bool _isCompleting = false;
+  bool _hasNavigated = false;
+
+  void _navigateToHome() {
+    if (_hasNavigated || !mounted) return;
+    _hasNavigated = true;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const MyApp()),
+          (route) => false,
+    );
+  }
 
   final _ridesService = RidesService();
 
@@ -127,10 +139,10 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
   }
 
   Future<void> _cancelRide(String rideId) async {
-    if (!mounted) return;
+    if (!mounted || _isCancelling || _hasNavigated) return;
 
     try {
-      setState(() => _isProcessing = true);
+      setState(() => _isCancelling = true);
 
       // Get ride details for driver ID
       final rideDoc = await FirebaseFirestore.instance
@@ -164,16 +176,19 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
 
       // Reset processing state before navigation
       if (mounted) {
-        setState(() => _isProcessing = false);
+        setState(() => _isCancelling = false);
       }
 
       // Navigate after resetting state
-      if (mounted) {
-        Navigator.of(navigatorContext).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-              (route) => false,
-        );
-      }
+      // if (mounted) {
+      //   Navigator.pop(context);
+      //   Navigator.pop(context);
+      //   Navigator.of(navigatorContext).pushAndRemoveUntil(
+      //     MaterialPageRoute(builder: (context) => const MyApp()),
+      //         (route) => false,
+      //   );
+      // }
+      _navigateToHome();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -182,7 +197,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-        setState(() => _isProcessing = false);
+        setState(() => _isCancelling = false);
       }
     }
   }
@@ -221,7 +236,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
   }
 
   Future<void> _handleRideCompletion(Map<String, dynamic> rideData) async {
-    if (!mounted) return;
+    if (!mounted || _hasNavigated) return;
 
     // Store context reference
     final navigatorContext = context;
@@ -267,10 +282,11 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
 
     // Navigate to home screen
     if (!mounted) return;
-    Navigator.of(navigatorContext).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-    );
+    // Navigator.of(navigatorContext).pushAndRemoveUntil(
+    //   MaterialPageRoute(builder: (context) => const MyApp()),
+    //       (route) => false,
+    // );
+    _navigateToHome();
   }
 
   // Future<void> _completeRide(String rideId) async {
@@ -298,7 +314,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
       );
     } else if (identifier == 'home') {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (context) => const MyApp()),
             (route) => false,
       );
     }
@@ -329,14 +345,19 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
 
             if (completedRides.isEmpty) {
               // Use a single navigation call
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                        (route) => false,
-                  );
-                }
-              });
+              // WidgetsBinding.instance.addPostFrameCallback((_) {
+              //   if (mounted) {
+              //     Navigator.of(context).pushAndRemoveUntil(
+              //       MaterialPageRoute(builder: (context) => const MyApp()),
+              //           (route) => false,
+              //     );
+              //   }
+              // });
+              if (!_hasNavigated) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _navigateToHome();
+                });
+              }
               return const SizedBox(); // Return empty widget instead of loading
             }
 
@@ -375,6 +396,25 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
               Positioned.fill(
                 child: PassengerTrackingMap(
                   ride: currentRide,
+                ),
+              ),
+              Positioned(
+                top: 40,
+                left: 16,
+                child: Builder(
+                  builder: (context) => CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.menu,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                      onPressed: () {
+                        Scaffold.of(context).openDrawer();
+                      },
+                    ),
+                  ),
                 ),
               ),
 
@@ -435,7 +475,6 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                   ),
                 ),
 
-              // Bottom Buttons
               // Bottom Buttons
               if (rideStatus == 'picked' && _distanceToDestination != null)
                 Positioned(
@@ -513,7 +552,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: _isProcessing
+                            onPressed: _isCancelling
                                 ? null
                                 : () => _cancelRide(currentRide['id']),
                             style: ElevatedButton.styleFrom(
@@ -524,7 +563,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            child: _isProcessing
+                            child: _isCancelling
                                 ? const CircularProgressIndicator(color: Colors.white)
                                 : const Text("Cancel Ride"),
                           ),
@@ -553,7 +592,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: _isProcessing
+                            onPressed: _isCancelling
                                 ? null
                                 : () async {
                               await _showPaymentDialog(context, currentRide);
@@ -566,7 +605,7 @@ class _PassengerTrackingState extends ConsumerState<PassengerTracking> {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            child: _isProcessing
+                            child: _isCompleting
                                 ? const CircularProgressIndicator(color: Colors.white)
                                 : const Text("Complete Ride"),
                           ),

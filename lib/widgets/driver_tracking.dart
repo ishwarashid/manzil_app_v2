@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:manzil_app_v2/main.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
 import 'package:manzil_app_v2/screens/find_drivers.dart';
@@ -20,6 +21,17 @@ class DriverTracking extends ConsumerStatefulWidget {
 class _DriverTrackingState extends ConsumerState<DriverTracking> {
   bool _isProcessing = false;
   String? _processingRideId;
+  bool _hasNavigated = false;
+
+  // void _navigateToHome() {
+  //   if (_hasNavigated || !mounted) return;
+  //   _hasNavigated = true;
+  //
+  //   Navigator.of(context).pushAndRemoveUntil(
+  //     MaterialPageRoute(builder: (context) => const MyApp()),
+  //         (route) => false,
+  //   );
+  // }
 
   Stream<List<Map<String, dynamic>>> getRidesStream(String driverId) {
     return FirebaseFirestore.instance
@@ -123,7 +135,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
               scaffoldMessenger.showSnackBar(
                 const SnackBar(
                   content: Text('Fraud report submitted'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: Colors.redAccent,
                   duration: Duration(seconds: 2),
                 ),
               );
@@ -141,7 +153,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
               scaffoldMessenger.showSnackBar(
                 SnackBar(
                   content: Text('Error reporting fraud: $e'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: Colors.redAccent,
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -230,6 +242,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
       }
 
       if (mounted) {
+        print("hereeeeeeeeeeee");
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Ride cancelled successfully'),
@@ -242,7 +255,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to cancel ride: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.redAccent,
           ),
         );
       }
@@ -309,17 +322,17 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
             ..sort((a, b) => (a['distanceFromPassenger'] as num)
                 .compareTo(b['distanceFromPassenger'] as num));
 
-          if (pendingRides.isEmpty) {
-            // Single navigation call with PostFrameCallback
+          if (pendingRides.isEmpty && !_hasNavigated) {
+            _hasNavigated = true;  // Set the flag to prevent multiple navigations
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                  (route) => false,
+                  MaterialPageRoute(builder: (context) => const MyApp()),
+                      (route) => false,
                 );
               }
             });
-            return const SizedBox();
+            return const SizedBox(); // Return empty widget while navigating
           }
 
           // if (pendingRides.isEmpty) {
@@ -423,7 +436,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
                           );
                         }
                       }

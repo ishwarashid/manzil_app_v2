@@ -121,7 +121,7 @@ class DriverPassengerService {
       await _chatService.createChatRoom(currentUser, driverInfo['driverId']);
 
       // Cancel other drivers
-      await _cancelOtherDrivers(rideId, driverInfo['driverId']);
+      // await _cancelOtherDrivers(rideId, driverInfo['driverId']);
 
     } catch (e) {
       print('Error accepting driver: $e');

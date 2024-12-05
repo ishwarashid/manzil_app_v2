@@ -95,7 +95,7 @@ class CurrentUserNotifier extends StateNotifier<Map<String, dynamic>> {
           'Accept': 'application/json',
           'User-Agent': 'Manzil App',
         },
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

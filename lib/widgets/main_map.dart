@@ -132,13 +132,13 @@ class _MainMapState extends ConsumerState<MainMap> {
                   children: [
                     Icon(
                       Icons.location_on,
-                      color: Colors.red,
+                      color: Color.fromARGB(255, 255, 107, 74),
                       size: 30,
                     ),
                     Text(
                       'Destination',
                       style: TextStyle(
-                        color: Colors.red,
+                        color: Color.fromARGB(255, 255, 107, 74),
                         fontWeight: FontWeight.bold,
                       ),
                     ),

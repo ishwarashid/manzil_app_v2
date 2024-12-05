@@ -33,7 +33,7 @@ class _FindDriversState extends ConsumerState<FindDrivers> {
         currentUser: currentUser,
         driverInfo: driverInfo,
       );
-      await _chatService.createChatRoom(currentUser, driverInfo['driverId']);
+      // await _chatService.createChatRoom(currentUser, driverInfo['driverId']);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
