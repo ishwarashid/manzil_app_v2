@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+
 import 'package:http/http.dart' as http;
 import 'package:manzil_app_v2/data/swl_locations.dart';
 import 'package:manzil_app_v2/models/location_suggestion.dart';

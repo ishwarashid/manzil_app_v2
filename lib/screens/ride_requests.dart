@@ -6,7 +6,6 @@ import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
 import 'package:manzil_app_v2/screens/chats_screen.dart';
 import 'package:manzil_app_v2/screens/setup_driver_screen.dart';
 import 'package:manzil_app_v2/screens/user_chat_screen.dart';
-import 'package:manzil_app_v2/services/chat/chat_services.dart';
 import 'package:manzil_app_v2/services/ride/ride_services.dart';
 import 'package:manzil_app_v2/widgets/destination_alert_dialog.dart';
 

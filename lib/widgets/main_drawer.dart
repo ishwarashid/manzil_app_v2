@@ -6,7 +6,6 @@ import 'package:manzil_app_v2/providers/booking_inputs_provider.dart';
 import 'package:manzil_app_v2/providers/current_user_provider.dart';
 import 'package:manzil_app_v2/providers/rides_filter_provider.dart';
 import 'package:manzil_app_v2/providers/user_ride_providers.dart';
-import 'package:manzil_app_v2/screens/tracking.dart';
 
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key, required this.onSelectScreen});

@@ -142,7 +142,7 @@ class _DriverTrackingState extends ConsumerState<DriverTracking> {
                 SnackBar(
                   content: Text('Error reporting fraud: $e'),
                   backgroundColor: Colors.red,
-                  duration: Duration(seconds: 2),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             } catch (e) {

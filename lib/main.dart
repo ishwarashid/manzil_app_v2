@@ -1,16 +1,13 @@
 import 'dart:io';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:manzil_app_v2/screens/home_screen.dart';
-import 'firebase_options.dart';
 import 'package:manzil_app_v2/screens/splash_screen.dart';
 
-import 'package:manzil_app_v2/screens/start_screen.dart';
+import 'firebase_options.dart';
 
 // var kLightColorScheme = ColorScheme.fromSeed(
 //   seedColor: const Color.fromARGB(255, 52, 59, 113),
